@@ -6,7 +6,7 @@ description = "A library for processing application configuration easily."
 homepage = "https://github.com/Kixunil/configure_me"
 repository = "https://github.com/Kixunil/configure_me"
 readme = "README.md"
-keywords = ["configuration", "arguments", "env vars", "codegen"]
+keywords = ["configuration", "arguments", "environment", "codegen"]
 categories = ["command-line-interface", "config", "encoding"]
 license = "MITNFA"
 maintenance = { status = "experimental" }
