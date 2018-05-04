@@ -33,9 +33,11 @@ pub mod raw {
     impl Config {
         pub fn validate(self) -> Result<super::Config, ValidationError> {
             let default_optional = self.defaults.optional;
+            let default_argument = self.defaults.args;
+            let default_env_var = self.defaults.env_vars;
             let params = self.params
                 .into_iter()
-                .map(|param| param.validate(default_optional))
+                .map(|param| param.validate(default_optional, default_argument, default_env_var))
                 .collect::<Result<Vec<_>, _>>()?;
 
             let switches = self.switches
@@ -63,10 +65,12 @@ pub mod raw {
         optional: Option<bool>,
         default: Option<String>,
         doc: Option<String>,
+        argument: Option<bool>,
+        env_var: Option<bool>,
     }
 
     impl Param {
-        fn validate(self, default_optional: bool) -> Result<super::Param, ValidationError> {
+        fn validate(self, default_optional: bool, default_argument: bool, default_env_var: bool) -> Result<super::Param, ValidationError> {
             use super::Optionality;
 
             let optionality = match (self.optional, default_optional, self.default) {
@@ -93,12 +97,17 @@ pub mod raw {
                 None
             };
 
+            let argument = self.argument.unwrap_or(default_argument);
+            let env_var = self.env_var.unwrap_or(default_env_var);
+
             Ok(super::Param {
                 name: self.name,
                 ty: self.ty,
                 optionality,
                 abbr,
                 doc: self.doc,
+                argument,
+                env_var,
             })
         }
     }
@@ -164,8 +173,6 @@ pub struct Defaults {
     #[serde(default = "make_true")]
     pub env_vars: bool,
     #[serde(default = "make_true")]
-    pub config_file: bool,
-    #[serde(default = "make_true")]
     pub optional: bool,
 }
 
@@ -174,7 +181,6 @@ impl Default for Defaults {
         Defaults {
             args: true,
             env_vars: true,
-            config_file: true,
             optional: true,
         }
     }
@@ -198,6 +204,8 @@ pub struct Param {
     pub ty: String,
     pub optionality: Optionality,
     pub doc: Option<String>,
+    pub argument: bool,
+    pub env_var: bool,
 }
 
 pub struct Switch {
