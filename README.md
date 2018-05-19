@@ -6,7 +6,10 @@ A Rust library for processing application configuration easily
 About
 -----
 
-This library aims to help with reading configuration of application from files, environment variables and command line arguments, merging it together and validating. It auto-generates most of the code for you based on configuration (heh) file. It creates a struct for you, which contains all the parsed and validated fields, so you can access the information quickly easily and idiomatically.
+This library aims to help with reading configuration of application from files, environment variables and command line arguments, merging it together and validating.
+It auto-generates most of the parsing and deserializing code for you based on build configuration (heh) file.
+It creates a struct for you, which you can use to read configuration into.
+It will contain all the parsed and validated fields, so you can access the information quickly easily and idiomatically.
 
 The generated code is formatted to be easy to read and understand.
 
