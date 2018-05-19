@@ -37,6 +37,10 @@ fn gen_arg_parse_error<W: Write>(config: &Config, mut output: W) -> io::Result<(
     writeln!(output, "    BadUtf8(&'static str),")?;
     writeln!(output)?;
     for param in &config.params {
+        if !param.argument {
+            continue;
+        }
+
         write!(output, "    Field")?;
         pascal_case(&mut output, &param.name)?;
         writeln!(output, "(<{} as ::std::str::FromStr>::Err),", param.ty)?;
@@ -127,6 +131,10 @@ fn underscore_to_hypen<W: Write>(mut output: W, ident: &str) -> io::Result<()> {
 
 fn gen_arg_parse_params<W: Write>(config: &Config, mut output: W) -> io::Result<()> {
     for param in &config.params {
+        if !param.argument {
+            continue;
+        }
+
         write!(output, "                }} else if arg == *\"--")?;
         underscore_to_hypen(&mut output, &param.name)?;
         writeln!(output, "\" {{")?;

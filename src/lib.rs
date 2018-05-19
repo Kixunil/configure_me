@@ -217,6 +217,14 @@ name = "fast"
 default = true
 "#;
 
+    pub const NO_ARG: &str =
+r#"
+[[param]]
+name = "foo"
+type = "u32"
+argument = false
+"#;
+
     pub struct ExpectedOutput {
         pub raw_config: &'static str,
         pub validate: &'static str,
@@ -682,6 +690,56 @@ pub enum ArgParseError {
 "#,
     };
 
+    pub const EXPECTED_NO_ARG: ExpectedOutput = ExpectedOutput {
+        raw_config:
+r#"    #[derive(Deserialize, Default)]
+    pub struct Config {
+        _program_path: Option<PathBuf>,
+        foo: Option<u32>,
+    }
+"#,
+        validate:
+r#"        pub fn validate(self) -> Result<super::Config, ValidationError> {
+            let foo = self.foo;
+
+            Ok(super::Config {
+                foo,
+            })
+        }
+"#,
+        merge_args:
+r#"        pub fn merge_args<I: IntoIterator<Item=::std::ffi::OsString>>(&mut self, args: I) -> Result<(), ArgParseError> {
+            let mut iter = args.into_iter();
+            self._program_path = iter.next().map(Into::into);
+
+            while let Some(arg) = iter.next() {
+                if arg == *"--" {
+                    break;
+                } else {
+                    return Err(ArgParseError::UnknownArgument);
+                }
+            }
+
+            Ok(())
+        }
+"#,
+        config:
+r#"/// Configuration of the application
+pub struct Config {
+    pub foo: Option<u32>,
+}
+"#,
+        arg_parse_error:
+r#"#[derive(Debug)]
+pub enum ArgParseError {
+    MissingArgument(&'static str),
+    UnknownArgument,
+    BadUtf8(&'static str),
+
+}
+"#,
+    };
+
 
     fn check(src: &str, expected: &str) {
         let mut src = src.as_bytes();
@@ -718,5 +776,10 @@ pub enum ArgParseError {
     #[test]
     fn multiple_params() {
         check(MULTIPLE_PARAMS, &EXPECTED_MULTIPLE_PARAMS.complete());
+    }
+
+    #[test]
+    fn no_arg() {
+        check(NO_ARG, &EXPECTED_NO_ARG.complete());
     }
 }
