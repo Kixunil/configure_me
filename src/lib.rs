@@ -228,6 +228,7 @@ argument = false
     pub struct ExpectedOutput {
         pub raw_config: &'static str,
         pub validate: &'static str,
+        pub merge_in: &'static str,
         pub merge_args: &'static str,
         pub config: &'static str,
         pub arg_parse_error: &'static str,
@@ -279,19 +280,31 @@ mod raw {{
     use super::{{ArgParseError, ValidationError}};
 {}
     impl Config {{
+        pub fn load<P: AsRef<::std::path::Path>>(config_file: P) -> Result<Self, super::Error> {{
+            use std::io::Read;
+
+            let mut config_file = ::std::fs::File::open(config_file)?;
+            let mut config_content = Vec::new();
+            config_file.read_to_end(&mut config_content)?;
+            ::toml::from_slice(&config_content).map_err(Into::into)
+        }}
+
+{}
 {}
 {}    }}
 }}
 
 {}
 impl Config {{
-    pub fn gather<P: AsRef<::std::path::Path>>(config_file: P) -> Result<Self, Error> {{
-        use std::io::Read;
-
-        let mut config_file = ::std::fs::File::open(config_file)?;
-        let mut config_content = Vec::new();
-        config_file.read_to_end(&mut config_content)?;
-        let mut config = ::toml::from_slice::<raw::Config>(&config_content)?;
+    pub fn including_optional_config_files<I>(config_files: I) -> Result<Self, Error> where I: IntoIterator, I::Item: AsRef<::std::path::Path> {{
+        let mut config = raw::Config::default();
+        for path in config_files {{
+            match raw::Config::load(path) {{
+                Ok(new_config) => config.merge_in(new_config),
+                Err(Error::Reading(ref err)) if err.kind() == ::std::io::ErrorKind::NotFound => (),
+                Err(err) => return Err(err),
+            }}
+        }}
         config.merge_args(::std::env::args_os())?;
         config.validate().map_err(Into::into)
     }}
@@ -300,6 +313,7 @@ impl Config {{
             self.arg_parse_error,
             self.raw_config,
             self.validate,
+            self.merge_in,
             self.merge_args,
             self.config
                    )
@@ -320,8 +334,12 @@ r#"        pub fn validate(self) -> Result<super::Config, ValidationError> {
             })
         }
 "#,
+        merge_in:
+r#"        pub fn merge_in(&mut self, other: Self) {
+        }
+"#,
         merge_args:
-r#"        pub fn merge_args<I: IntoIterator<Item=::std::ffi::OsString>>(&mut self, args: I) -> Result<(), ArgParseError> {
+r#"        pub fn merge_args<I: IntoIterator<Item=::std::ffi::OsString>>(&mut self, args: I) -> Result<(), super::Error> {
             let mut iter = args.into_iter();
             self._program_path = iter.next().map(Into::into);
 
@@ -329,7 +347,7 @@ r#"        pub fn merge_args<I: IntoIterator<Item=::std::ffi::OsString>>(&mut se
                 if arg == *"--" {
                     break;
                 } else {
-                    return Err(ArgParseError::UnknownArgument);
+                    return Err(ArgParseError::UnknownArgument.into());
                 }
             }
 
@@ -369,8 +387,15 @@ r#"        pub fn validate(self) -> Result<super::Config, ValidationError> {
             })
         }
 "#,
+        merge_in:
+r#"        pub fn merge_in(&mut self, other: Self) {
+            if self.foo.is_none() {
+                self.foo = other.foo;
+            }
+        }
+"#,
         merge_args:
-r#"        pub fn merge_args<I: IntoIterator<Item=::std::ffi::OsString>>(&mut self, args: I) -> Result<(), ArgParseError> {
+r#"        pub fn merge_args<I: IntoIterator<Item=::std::ffi::OsString>>(&mut self, args: I) -> Result<(), super::Error> {
             let mut iter = args.into_iter();
             self._program_path = iter.next().map(Into::into);
 
@@ -388,7 +413,7 @@ r#"        pub fn merge_args<I: IntoIterator<Item=::std::ffi::OsString>>(&mut se
 
                     self.foo = Some(foo);
                 } else {
-                    return Err(ArgParseError::UnknownArgument);
+                    return Err(ArgParseError::UnknownArgument.into());
                 }
             }
 
@@ -430,8 +455,15 @@ r#"        pub fn validate(self) -> Result<super::Config, ValidationError> {
             })
         }
 "#,
+        merge_in:
+r#"        pub fn merge_in(&mut self, other: Self) {
+            if self.foo.is_none() {
+                self.foo = other.foo;
+            }
+        }
+"#,
         merge_args:
-r#"        pub fn merge_args<I: IntoIterator<Item=::std::ffi::OsString>>(&mut self, args: I) -> Result<(), ArgParseError> {
+r#"        pub fn merge_args<I: IntoIterator<Item=::std::ffi::OsString>>(&mut self, args: I) -> Result<(), super::Error> {
             let mut iter = args.into_iter();
             self._program_path = iter.next().map(Into::into);
 
@@ -449,7 +481,7 @@ r#"        pub fn merge_args<I: IntoIterator<Item=::std::ffi::OsString>>(&mut se
 
                     self.foo = Some(foo);
                 } else {
-                    return Err(ArgParseError::UnknownArgument);
+                    return Err(ArgParseError::UnknownArgument.into());
                 }
             }
 
@@ -491,8 +523,15 @@ r#"        pub fn validate(self) -> Result<super::Config, ValidationError> {
             })
         }
 "#,
+        merge_in:
+r#"        pub fn merge_in(&mut self, other: Self) {
+            if self.foo.is_none() {
+                self.foo = other.foo;
+            }
+        }
+"#,
         merge_args:
-r#"        pub fn merge_args<I: IntoIterator<Item=::std::ffi::OsString>>(&mut self, args: I) -> Result<(), ArgParseError> {
+r#"        pub fn merge_args<I: IntoIterator<Item=::std::ffi::OsString>>(&mut self, args: I) -> Result<(), super::Error> {
             let mut iter = args.into_iter();
             self._program_path = iter.next().map(Into::into);
 
@@ -510,7 +549,7 @@ r#"        pub fn merge_args<I: IntoIterator<Item=::std::ffi::OsString>>(&mut se
 
                     self.foo = Some(foo);
                 } else {
-                    return Err(ArgParseError::UnknownArgument);
+                    return Err(ArgParseError::UnknownArgument.into());
                 }
             }
 
@@ -540,20 +579,26 @@ pub enum ArgParseError {
 r#"    #[derive(Deserialize, Default)]
     pub struct Config {
         _program_path: Option<PathBuf>,
-        #[serde(default)]
-        foo: bool,
+        foo: Option<bool>,
     }
 "#,
         validate:
 r#"        pub fn validate(self) -> Result<super::Config, ValidationError> {
 
             Ok(super::Config {
-                foo: self.foo,
+                foo: self.foo.unwrap_or(false),
             })
         }
 "#,
+        merge_in:
+r#"        pub fn merge_in(&mut self, other: Self) {
+            if self.foo.is_none() {
+                self.foo = other.foo;
+            }
+        }
+"#,
         merge_args:
-r#"        pub fn merge_args<I: IntoIterator<Item=::std::ffi::OsString>>(&mut self, args: I) -> Result<(), ArgParseError> {
+r#"        pub fn merge_args<I: IntoIterator<Item=::std::ffi::OsString>>(&mut self, args: I) -> Result<(), super::Error> {
             let mut iter = args.into_iter();
             self._program_path = iter.next().map(Into::into);
 
@@ -561,9 +606,9 @@ r#"        pub fn merge_args<I: IntoIterator<Item=::std::ffi::OsString>>(&mut se
                 if arg == *"--" {
                     break;
                 } else if arg == *"--foo" {
-                    self.foo = true;
+                    self.foo = Some(true);
                 } else {
-                    return Err(ArgParseError::UnknownArgument);
+                    return Err(ArgParseError::UnknownArgument.into());
                 }
             }
 
@@ -595,10 +640,8 @@ r#"    #[derive(Deserialize, Default)]
         foo: Option<u32>,
         bar: Option<String>,
         baz: Option<String>,
-        #[serde(default)]
-        verbose: bool,
-        #[serde(default = "make_true")]
-        fast: bool,
+        verbose: Option<bool>,
+        fast: Option<bool>,
     }
 "#,
         validate:
@@ -611,13 +654,32 @@ r#"        pub fn validate(self) -> Result<super::Config, ValidationError> {
                 foo,
                 bar,
                 baz,
-                verbose: self.verbose,
-                fast: self.fast,
+                verbose: self.verbose.unwrap_or(false),
+                fast: self.fast.unwrap_or(true),
             })
         }
 "#,
+        merge_in:
+r#"        pub fn merge_in(&mut self, other: Self) {
+            if self.foo.is_none() {
+                self.foo = other.foo;
+            }
+            if self.bar.is_none() {
+                self.bar = other.bar;
+            }
+            if self.baz.is_none() {
+                self.baz = other.baz;
+            }
+            if self.verbose.is_none() {
+                self.verbose = other.verbose;
+            }
+            if self.fast.is_none() {
+                self.fast = other.fast;
+            }
+        }
+"#,
         merge_args:
-r#"        pub fn merge_args<I: IntoIterator<Item=::std::ffi::OsString>>(&mut self, args: I) -> Result<(), ArgParseError> {
+r#"        pub fn merge_args<I: IntoIterator<Item=::std::ffi::OsString>>(&mut self, args: I) -> Result<(), super::Error> {
             let mut iter = args.into_iter();
             self._program_path = iter.next().map(Into::into);
 
@@ -655,11 +717,11 @@ r#"        pub fn merge_args<I: IntoIterator<Item=::std::ffi::OsString>>(&mut se
 
                     self.baz = Some(baz);
                 } else if arg == *"--verbose" {
-                    self.verbose = true;
+                    self.verbose = Some(true);
                 } else if arg == *"--no-fast" {
-                    self.fast = false;
+                    self.fast = Some(false);
                 } else {
-                    return Err(ArgParseError::UnknownArgument);
+                    return Err(ArgParseError::UnknownArgument.into());
                 }
             }
 
@@ -707,8 +769,15 @@ r#"        pub fn validate(self) -> Result<super::Config, ValidationError> {
             })
         }
 "#,
+        merge_in:
+r#"        pub fn merge_in(&mut self, other: Self) {
+            if self.foo.is_none() {
+                self.foo = other.foo;
+            }
+        }
+"#,
         merge_args:
-r#"        pub fn merge_args<I: IntoIterator<Item=::std::ffi::OsString>>(&mut self, args: I) -> Result<(), ArgParseError> {
+r#"        pub fn merge_args<I: IntoIterator<Item=::std::ffi::OsString>>(&mut self, args: I) -> Result<(), super::Error> {
             let mut iter = args.into_iter();
             self._program_path = iter.next().map(Into::into);
 
@@ -716,7 +785,7 @@ r#"        pub fn merge_args<I: IntoIterator<Item=::std::ffi::OsString>>(&mut se
                 if arg == *"--" {
                     break;
                 } else {
-                    return Err(ArgParseError::UnknownArgument);
+                    return Err(ArgParseError::UnknownArgument.into());
                 }
             }
 

@@ -10,11 +10,7 @@ fn gen_raw_params<W: Write>(config: &Config, mut output: W) -> io::Result<()> {
 
 fn gen_raw_switches<W: Write>(config: &Config, mut output: W) -> io::Result<()> {
     for switch in &config.switches {
-        match switch.kind {
-            SwitchKind::Inverted => writeln!(output, "        #[serde(default = \"make_true\")]"),
-            _ => writeln!(output, "        #[serde(default)]"),
-        }?;
-        writeln!(output, "        {}: bool,", switch.name)?;
+        writeln!(output, "        {}: Option<bool>,", switch.name)?;
     }
     Ok(())
 }
@@ -86,7 +82,11 @@ fn gen_construct_config_params<W: Write>(config: &Config, mut output: W) -> io::
 
 fn gen_copy_switches<W: Write>(config: &Config, mut output: W) -> io::Result<()> {
     for switch in &config.switches {
-        writeln!(output, "                {}: self.{},", switch.name, switch.name)?;
+        let default_value = match switch.kind {
+            SwitchKind::Inverted => "true",
+            _ => "false",
+        };
+        writeln!(output, "                {}: self.{}.unwrap_or({}),", switch.name, switch.name, default_value)?;
     }
     Ok(())
 }
@@ -99,6 +99,22 @@ fn gen_validation_fn<W: Write>(config: &Config, mut output: W) -> io::Result<()>
     gen_construct_config_params(config, &mut output)?;
     gen_copy_switches(config, &mut output)?;
     writeln!(output, "            }})")?;
+    writeln!(output, "        }}")?;
+    Ok(())
+}
+
+fn gen_merge_in<W: Write>(config: &Config, mut output: W) -> io::Result<()> {
+    writeln!(output, "        pub fn merge_in(&mut self, other: Self) {{")?;
+    for param in &config.params {
+        writeln!(output, "            if self.{}.is_none() {{", param.name)?;
+        writeln!(output, "                self.{} = other.{};", param.name, param.name)?;
+        writeln!(output, "            }}")?;
+    }
+    for switch in &config.switches {
+        writeln!(output, "            if self.{}.is_none() {{", switch.name)?;
+        writeln!(output, "                self.{} = other.{};", switch.name, switch.name)?;
+        writeln!(output, "            }}")?;
+    }
     writeln!(output, "        }}")?;
     Ok(())
 }
@@ -158,7 +174,7 @@ fn gen_arg_parse_params<W: Write>(config: &Config, mut output: W) -> io::Result<
 }
 
 fn gen_merge_args<W: Write>(config: &Config, mut output: W) -> io::Result<()> {
-    writeln!(output, "        pub fn merge_args<I: IntoIterator<Item=::std::ffi::OsString>>(&mut self, args: I) -> Result<(), ArgParseError> {{")?;
+    writeln!(output, "        pub fn merge_args<I: IntoIterator<Item=::std::ffi::OsString>>(&mut self, args: I) -> Result<(), super::Error> {{")?;
     writeln!(output, "            let mut iter = args.into_iter();")?;
     writeln!(output, "            self._program_path = iter.next().map(Into::into);")?;
     writeln!(output)?;
@@ -168,7 +184,7 @@ fn gen_merge_args<W: Write>(config: &Config, mut output: W) -> io::Result<()> {
     gen_arg_parse_params(config, &mut output)?;
     gen_arg_parse_switches(config, &mut output)?;
     writeln!(output, "                }} else {{")?;
-    writeln!(output, "                    return Err(ArgParseError::UnknownArgument);")?;
+    writeln!(output, "                    return Err(ArgParseError::UnknownArgument.into());")?;
     writeln!(output, "                }}")?;
     writeln!(output, "            }}")?;
     writeln!(output)?;
@@ -182,11 +198,11 @@ fn gen_arg_parse_switches<W: Write>(config: &Config, mut output: W) -> io::Resul
         match switch.kind {
             SwitchKind::Inverted => {
                 writeln!(output, "                }} else if arg == *\"--no-{}\" {{", switch.name)?;
-                writeln!(output, "                    self.{} = false;", switch.name)?;
+                writeln!(output, "                    self.{} = Some(false);", switch.name)?;
             },
             _ => {
                 writeln!(output, "                }} else if arg == *\"--{}\" {{", switch.name)?;
-                writeln!(output, "                    self.{} = true;", switch.name)?;
+                writeln!(output, "                    self.{} = Some(true);", switch.name)?;
             }
         }
     }
@@ -239,7 +255,18 @@ pub fn generate_code<W: Write>(config: &Config, mut output: W) -> io::Result<()>
     gen_raw_config(config, &mut output)?;
     writeln!(output)?;
     writeln!(output, "    impl Config {{")?;
+    writeln!(output, "        pub fn load<P: AsRef<::std::path::Path>>(config_file: P) -> Result<Self, super::Error> {{")?;
+    writeln!(output, "            use std::io::Read;")?;
+    writeln!(output)?;
+    writeln!(output, "            let mut config_file = ::std::fs::File::open(config_file)?;")?;
+    writeln!(output, "            let mut config_content = Vec::new();")?;
+    writeln!(output, "            config_file.read_to_end(&mut config_content)?;")?;
+    writeln!(output, "            ::toml::from_slice(&config_content).map_err(Into::into)")?;
+    writeln!(output, "        }}")?;
+    writeln!(output)?;
     gen_validation_fn(config, &mut output)?;
+    writeln!(output)?;
+    gen_merge_in(config, &mut output)?;
     writeln!(output)?;
     gen_merge_args(config, &mut output)?;
     writeln!(output, "    }}")?;
@@ -252,13 +279,15 @@ pub fn generate_code<W: Write>(config: &Config, mut output: W) -> io::Result<()>
     writeln!(output, "}}")?;
     writeln!(output)?;
     writeln!(output, "impl Config {{")?;
-    writeln!(output, "    pub fn gather<P: AsRef<::std::path::Path>>(config_file: P) -> Result<Self, Error> {{")?;
-    writeln!(output, "        use std::io::Read;")?;
-    writeln!(output)?;
-    writeln!(output, "        let mut config_file = ::std::fs::File::open(config_file)?;")?;
-    writeln!(output, "        let mut config_content = Vec::new();")?;
-    writeln!(output, "        config_file.read_to_end(&mut config_content)?;")?;
-    writeln!(output, "        let mut config = ::toml::from_slice::<raw::Config>(&config_content)?;")?;
+    writeln!(output, "    pub fn including_optional_config_files<I>(config_files: I) -> Result<Self, Error> where I: IntoIterator, I::Item: AsRef<::std::path::Path> {{")?;
+    writeln!(output, "        let mut config = raw::Config::default();")?;
+    writeln!(output, "        for path in config_files {{")?;
+    writeln!(output, "            match raw::Config::load(path) {{")?;
+    writeln!(output, "                Ok(new_config) => config.merge_in(new_config),")?;
+    writeln!(output, "                Err(Error::Reading(ref err)) if err.kind() == ::std::io::ErrorKind::NotFound => (),")?;
+    writeln!(output, "                Err(err) => return Err(err),")?;
+    writeln!(output, "            }}")?;
+    writeln!(output, "        }}")?;
     writeln!(output, "        config.merge_args(::std::env::args_os())?;")?;
     writeln!(output, "        config.validate().map_err(Into::into)")?;
     writeln!(output, "    }}")?;
