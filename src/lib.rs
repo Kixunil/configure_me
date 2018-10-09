@@ -102,6 +102,9 @@ extern crate serde;
 #[macro_use]
 extern crate serde_derive;
 extern crate toml;
+#[cfg(test)]
+#[macro_use]
+extern crate pretty_assertions;
 
 pub(crate) mod config;
 pub(crate) mod codegen;

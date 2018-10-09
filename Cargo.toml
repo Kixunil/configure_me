@@ -15,3 +15,6 @@ maintenance = { status = "experimental" }
 serde = "1"
 serde_derive = "1"
 toml = "=0.4.5"
+
+[dev-dependencies]
+pretty_assertions = "0.5.1"
