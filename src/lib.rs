@@ -299,7 +299,7 @@ mod raw {{
 
 {}
 impl Config {{
-    pub fn including_optional_config_files<I>(config_files: I) -> Result<Self, Error> where I: IntoIterator, I::Item: AsRef<::std::path::Path> {{
+    pub fn including_optional_config_files<I>(config_files: I) -> Result<(Self, impl Iterator<Item=::std::ffi::OsString>), Error> where I: IntoIterator, I::Item: AsRef<::std::path::Path> {{
         let mut config = raw::Config::default();
         for path in config_files {{
             match raw::Config::load(path) {{
@@ -308,8 +308,11 @@ impl Config {{
                 Err(err) => return Err(err),
             }}
         }}
-        config.merge_args(::std::env::args_os())?;
-        config.validate().map_err(Into::into)
+        let remaining_args = config.merge_args(::std::env::args_os())?;
+        config
+            .validate()
+            .map(|cfg| (cfg, remaining_args))
+            .map_err(Into::into)
     }}
 }}
 "#,
@@ -342,19 +345,21 @@ r#"        pub fn merge_in(&mut self, other: Self) {
         }
 "#,
         merge_args:
-r#"        pub fn merge_args<I: IntoIterator<Item=::std::ffi::OsString>>(&mut self, args: I) -> Result<(), super::Error> {
-            let mut iter = args.into_iter();
+r#"        pub fn merge_args<I: IntoIterator<Item=::std::ffi::OsString>>(&mut self, args: I) -> Result<impl Iterator<Item=::std::ffi::OsString>, super::Error> {
+            let mut iter = args.into_iter().fuse();
             self._program_path = iter.next().map(Into::into);
 
             while let Some(arg) = iter.next() {
                 if arg == *"--" {
-                    break;
-                } else {
+                    return Ok(None.into_iter().chain(iter));
+                } else if arg.to_str().unwrap_or("").starts_with("--") {
                     return Err(ArgParseError::UnknownArgument.into());
+                } else {
+                    return Ok(Some(arg).into_iter().chain(iter))
                 }
             }
 
-            Ok(())
+            Ok(None.into_iter().chain(iter))
         }
 "#,
         config:
@@ -398,13 +403,13 @@ r#"        pub fn merge_in(&mut self, other: Self) {
         }
 "#,
         merge_args:
-r#"        pub fn merge_args<I: IntoIterator<Item=::std::ffi::OsString>>(&mut self, args: I) -> Result<(), super::Error> {
-            let mut iter = args.into_iter();
+r#"        pub fn merge_args<I: IntoIterator<Item=::std::ffi::OsString>>(&mut self, args: I) -> Result<impl Iterator<Item=::std::ffi::OsString>, super::Error> {
+            let mut iter = args.into_iter().fuse();
             self._program_path = iter.next().map(Into::into);
 
             while let Some(arg) = iter.next() {
                 if arg == *"--" {
-                    break;
+                    return Ok(None.into_iter().chain(iter));
                 } else if arg == *"--foo" {
                     let foo = iter.next().ok_or(ArgParseError::MissingArgument("--foo"))?;
 
@@ -415,12 +420,14 @@ r#"        pub fn merge_args<I: IntoIterator<Item=::std::ffi::OsString>>(&mut se
                         .map_err(ArgParseError::FieldFoo)?;
 
                     self.foo = Some(foo);
-                } else {
+                } else if arg.to_str().unwrap_or("").starts_with("--") {
                     return Err(ArgParseError::UnknownArgument.into());
+                } else {
+                    return Ok(Some(arg).into_iter().chain(iter))
                 }
             }
 
-            Ok(())
+            Ok(None.into_iter().chain(iter))
         }
 "#,
         config:
@@ -466,13 +473,13 @@ r#"        pub fn merge_in(&mut self, other: Self) {
         }
 "#,
         merge_args:
-r#"        pub fn merge_args<I: IntoIterator<Item=::std::ffi::OsString>>(&mut self, args: I) -> Result<(), super::Error> {
-            let mut iter = args.into_iter();
+r#"        pub fn merge_args<I: IntoIterator<Item=::std::ffi::OsString>>(&mut self, args: I) -> Result<impl Iterator<Item=::std::ffi::OsString>, super::Error> {
+            let mut iter = args.into_iter().fuse();
             self._program_path = iter.next().map(Into::into);
 
             while let Some(arg) = iter.next() {
                 if arg == *"--" {
-                    break;
+                    return Ok(None.into_iter().chain(iter));
                 } else if arg == *"--foo" {
                     let foo = iter.next().ok_or(ArgParseError::MissingArgument("--foo"))?;
 
@@ -483,12 +490,14 @@ r#"        pub fn merge_args<I: IntoIterator<Item=::std::ffi::OsString>>(&mut se
                         .map_err(ArgParseError::FieldFoo)?;
 
                     self.foo = Some(foo);
-                } else {
+                } else if arg.to_str().unwrap_or("").starts_with("--") {
                     return Err(ArgParseError::UnknownArgument.into());
+                } else {
+                    return Ok(Some(arg).into_iter().chain(iter))
                 }
             }
 
-            Ok(())
+            Ok(None.into_iter().chain(iter))
         }
 "#,
         config:
@@ -534,13 +543,13 @@ r#"        pub fn merge_in(&mut self, other: Self) {
         }
 "#,
         merge_args:
-r#"        pub fn merge_args<I: IntoIterator<Item=::std::ffi::OsString>>(&mut self, args: I) -> Result<(), super::Error> {
-            let mut iter = args.into_iter();
+r#"        pub fn merge_args<I: IntoIterator<Item=::std::ffi::OsString>>(&mut self, args: I) -> Result<impl Iterator<Item=::std::ffi::OsString>, super::Error> {
+            let mut iter = args.into_iter().fuse();
             self._program_path = iter.next().map(Into::into);
 
             while let Some(arg) = iter.next() {
                 if arg == *"--" {
-                    break;
+                    return Ok(None.into_iter().chain(iter));
                 } else if arg == *"--foo" {
                     let foo = iter.next().ok_or(ArgParseError::MissingArgument("--foo"))?;
 
@@ -551,12 +560,14 @@ r#"        pub fn merge_args<I: IntoIterator<Item=::std::ffi::OsString>>(&mut se
                         .map_err(ArgParseError::FieldFoo)?;
 
                     self.foo = Some(foo);
-                } else {
+                } else if arg.to_str().unwrap_or("").starts_with("--") {
                     return Err(ArgParseError::UnknownArgument.into());
+                } else {
+                    return Ok(Some(arg).into_iter().chain(iter))
                 }
             }
 
-            Ok(())
+            Ok(None.into_iter().chain(iter))
         }
 "#,
         config:
@@ -601,21 +612,23 @@ r#"        pub fn merge_in(&mut self, other: Self) {
         }
 "#,
         merge_args:
-r#"        pub fn merge_args<I: IntoIterator<Item=::std::ffi::OsString>>(&mut self, args: I) -> Result<(), super::Error> {
-            let mut iter = args.into_iter();
+r#"        pub fn merge_args<I: IntoIterator<Item=::std::ffi::OsString>>(&mut self, args: I) -> Result<impl Iterator<Item=::std::ffi::OsString>, super::Error> {
+            let mut iter = args.into_iter().fuse();
             self._program_path = iter.next().map(Into::into);
 
             while let Some(arg) = iter.next() {
                 if arg == *"--" {
-                    break;
+                    return Ok(None.into_iter().chain(iter));
                 } else if arg == *"--foo" {
                     self.foo = Some(true);
-                } else {
+                } else if arg.to_str().unwrap_or("").starts_with("--") {
                     return Err(ArgParseError::UnknownArgument.into());
+                } else {
+                    return Ok(Some(arg).into_iter().chain(iter))
                 }
             }
 
-            Ok(())
+            Ok(None.into_iter().chain(iter))
         }
 "#,
         config:
@@ -682,13 +695,13 @@ r#"        pub fn merge_in(&mut self, other: Self) {
         }
 "#,
         merge_args:
-r#"        pub fn merge_args<I: IntoIterator<Item=::std::ffi::OsString>>(&mut self, args: I) -> Result<(), super::Error> {
-            let mut iter = args.into_iter();
+r#"        pub fn merge_args<I: IntoIterator<Item=::std::ffi::OsString>>(&mut self, args: I) -> Result<impl Iterator<Item=::std::ffi::OsString>, super::Error> {
+            let mut iter = args.into_iter().fuse();
             self._program_path = iter.next().map(Into::into);
 
             while let Some(arg) = iter.next() {
                 if arg == *"--" {
-                    break;
+                    return Ok(None.into_iter().chain(iter));
                 } else if arg == *"--foo" {
                     let foo = iter.next().ok_or(ArgParseError::MissingArgument("--foo"))?;
 
@@ -723,12 +736,14 @@ r#"        pub fn merge_args<I: IntoIterator<Item=::std::ffi::OsString>>(&mut se
                     self.verbose = Some(true);
                 } else if arg == *"--no-fast" {
                     self.fast = Some(false);
-                } else {
+                } else if arg.to_str().unwrap_or("").starts_with("--") {
                     return Err(ArgParseError::UnknownArgument.into());
+                } else {
+                    return Ok(Some(arg).into_iter().chain(iter))
                 }
             }
 
-            Ok(())
+            Ok(None.into_iter().chain(iter))
         }
 "#,
         config:
@@ -780,19 +795,21 @@ r#"        pub fn merge_in(&mut self, other: Self) {
         }
 "#,
         merge_args:
-r#"        pub fn merge_args<I: IntoIterator<Item=::std::ffi::OsString>>(&mut self, args: I) -> Result<(), super::Error> {
-            let mut iter = args.into_iter();
+r#"        pub fn merge_args<I: IntoIterator<Item=::std::ffi::OsString>>(&mut self, args: I) -> Result<impl Iterator<Item=::std::ffi::OsString>, super::Error> {
+            let mut iter = args.into_iter().fuse();
             self._program_path = iter.next().map(Into::into);
 
             while let Some(arg) = iter.next() {
                 if arg == *"--" {
-                    break;
-                } else {
+                    return Ok(None.into_iter().chain(iter));
+                } else if arg.to_str().unwrap_or("").starts_with("--") {
                     return Err(ArgParseError::UnknownArgument.into());
+                } else {
+                    return Ok(Some(arg).into_iter().chain(iter))
                 }
             }
 
-            Ok(())
+            Ok(None.into_iter().chain(iter))
         }
 "#,
         config:
