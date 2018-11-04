@@ -67,12 +67,14 @@
 //! toml = "0.4"
 //! 
 //! [build-dependencies]
-//! configure_me = "0.1"
+//! configure_me = "0.2.1"
 //! ```
 //! 
 //! Create a module `src/config.rs` for configuration:
 //! 
 //! ```rust,ignore
+//! #![allow(unused)]
+//!
 //! include!(concat!(env!("OUT_DIR"), "/config.rs"));
 //! ```
 //! 
@@ -86,15 +88,16 @@
 //! 
 //! mod config;
 //! 
-//! fn main() {
+//! fn main() -> Result<(), config::Error> {
 //!     // This will read configuration from "/etc/my_awesome_server/server.conf" file and
 //!     // the command-line arguments.
-//!     let server_config = config::Config::gather("/etc/my_awesome_server/server.conf").unwrap();
+//!     let (server_config, _remaining_args) = config::Config::including_optional_config_files(&["/etc/my_awesome_server/server.conf]")?;
 //! 
 //!     // Your code here
 //!     // E.g.:
 //!     let listener = std::net::TcpListener::bind((server_config.bind_addr, server_config.port)).expect("Failed to bind socket");
 //! 
+//!     Ok(())
 //! }
 //! ```
 
