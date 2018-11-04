@@ -1,35 +1,51 @@
-#[derive(Debug)]
 pub enum ArgParseError {
     MissingArgument(&'static str),
-    UnknownArgument,
+    UnknownArgument(String),
     BadUtf8(&'static str),
 
 <<"arg_parse_error.rs">>
 }
 
-#[derive(Debug)]
+impl ::std::fmt::Display for ArgParseError {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
+        match self {
+            ArgParseError::MissingArgument(arg) => write!(f, "A value to argument '{}' is missing.", arg),
+            ArgParseError::UnknownArgument(arg) => write!(f, "An unknown argument '{}' was specified.", arg),
+            ArgParseError::BadUtf8(arg) => write!(f, "The argument '{}' doesn't have valid UTF-8 encoding.", arg),
+<<"display_arg_parse_error.rs">>
+        }
+    }
+}
+
+impl ::std::fmt::Debug for ArgParseError {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
+        ::std::fmt::Display::fmt(self, f)
+    }
+}
+
 pub enum ValidationError {
     MissingField(&'static str),
 }
 
-#[derive(Debug)]
+impl ::std::fmt::Display for ValidationError {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
+        match self {
+            ValidationError::MissingField(field) => write!(f, "Configuration parameter '{}' not specified.", field),
+        }
+    }
+}
+
+impl ::std::fmt::Debug for ValidationError {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
+        ::std::fmt::Display::fmt(self, f)
+    }
+}
+
 pub enum Error {
-    Reading(::std::io::Error),
-    ConfigParsing(::toml::de::Error),
+    Reading { file: ::std::path::PathBuf, error: ::std::io::Error },
+    ConfigParsing { file: ::std::path::PathBuf, error: ::toml::de::Error },
     Arguments(ArgParseError),
     Validation(ValidationError),
-}
-
-impl From<::std::io::Error> for Error {
-    fn from(err: ::std::io::Error) -> Self {
-        Error::Reading(err)
-    }
-}
-
-impl From<::toml::de::Error> for Error {
-    fn from(err: ::toml::de::Error) -> Self {
-        Error::ConfigParsing(err)
-    }
 }
 
 impl From<ArgParseError> for Error {
@@ -44,6 +60,23 @@ impl From<ValidationError> for Error {
     }
 }
 
+impl ::std::fmt::Display for Error {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
+        match self {
+            Error::Reading { file, error } => write!(f, "Failed to read configuration file {}: {}", file.display(), error),
+            Error::ConfigParsing { file, error } => write!(f, "Failed to parse configuration file {}: {}", file.display(), error),
+            Error::Arguments(err) => write!(f, "{}", err),
+            Error::Validation(err) => write!(f, "Invalid configuration: {}", err),
+        }
+    }
+}
+
+impl ::std::fmt::Debug for Error {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
+        ::std::fmt::Display::fmt(self, f)
+    }
+}
+
 mod raw {
     use ::std::path::PathBuf;
     use super::{ArgParseError, ValidationError};
@@ -55,13 +88,13 @@ mod raw {
     }
 
     impl Config {
-        pub fn load<P: AsRef<::std::path::Path>>(config_file: P) -> Result<Self, super::Error> {
+        pub fn load<P: AsRef<::std::path::Path>>(config_file_name: P) -> Result<Self, super::Error> {
             use std::io::Read;
 
-            let mut config_file = ::std::fs::File::open(config_file)?;
+            let mut config_file = ::std::fs::File::open(&config_file_name).map_err(|error| super::Error::Reading { file: config_file_name.as_ref().into(), error })?;
             let mut config_content = Vec::new();
-            config_file.read_to_end(&mut config_content)?;
-            ::toml::from_slice(&config_content).map_err(Into::into)
+            config_file.read_to_end(&mut config_content).map_err(|error| super::Error::Reading { file: config_file_name.as_ref().into(), error })?;
+            ::toml::from_slice(&config_content).map_err(|error| super::Error::ConfigParsing { file: config_file_name.as_ref().into(), error })
         }
 
         pub fn validate(self) -> Result<super::Config, ValidationError> {
@@ -81,7 +114,7 @@ mod raw {
                     return Ok(None.into_iter().chain(iter));
 <<"merge_args.rs">>
                 } else if arg.to_str().unwrap_or("").starts_with("--") {
-                    return Err(ArgParseError::UnknownArgument.into());
+                    return Err(ArgParseError::UnknownArgument(arg.into_string().unwrap()).into());
                 } else {
                     return Ok(Some(arg).into_iter().chain(iter))
                 }
@@ -110,7 +143,7 @@ impl Config {
         for path in config_files {
             match raw::Config::load(path) {
                 Ok(new_config) => config.merge_in(new_config),
-                Err(Error::Reading(ref err)) if err.kind() == ::std::io::ErrorKind::NotFound => (),
+                Err(Error::Reading { ref error, .. }) if error.kind() == ::std::io::ErrorKind::NotFound => (),
                 Err(err) => return Err(err),
             }
         }

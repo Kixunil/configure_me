@@ -34,6 +34,21 @@ fn gen_arg_parse_error<W: Write>(config: &Config, mut output: W) -> io::Result<(
     Ok(())
 }
 
+fn gen_display_arg_parse_error<W: Write>(config: &Config, mut output: W) -> io::Result<()> {
+    for param in &config.params {
+        if !param.argument {
+            continue;
+        }
+
+        write!(output, "        ArgParseError::Field")?;
+        pascal_case(&mut output, &param.name)?;
+        write!(output, "(err) => write!(f, \"Failed to parse argument '--")?;
+        underscore_to_hypen(&mut output, &param.name)?;
+        writeln!(output, "': {{}}.\", err),")?;
+    }
+    Ok(())
+}
+
 fn gen_params<W: Write>(config: &Config, mut output: W) -> io::Result<()> {
     for param in &config.params {
         match param.optionality {
@@ -181,38 +196,54 @@ fn gen_arg_parse_switches<W: Write>(config: &Config, mut output: W) -> io::Resul
 }
 
 pub fn generate_code<W: Write>(config: &Config, mut output: W) -> io::Result<()> {
-    writeln!(output, "#[derive(Debug)]")?;
     writeln!(output, "pub enum ArgParseError {{")?;
     writeln!(output, "    MissingArgument(&'static str),")?;
-    writeln!(output, "    UnknownArgument,")?;
+    writeln!(output, "    UnknownArgument(String),")?;
     writeln!(output, "    BadUtf8(&'static str),")?;
     writeln!(output)?;
     gen_arg_parse_error(config, &mut output)?;
     writeln!(output, "}}")?;
     writeln!(output)?;
-    writeln!(output, "#[derive(Debug)]")?;
+    writeln!(output, "impl ::std::fmt::Display for ArgParseError {{")?;
+    writeln!(output, "    fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {{")?;
+    writeln!(output, "        match self {{")?;
+    writeln!(output, "            ArgParseError::MissingArgument(arg) => write!(f, \"A value to argument '{{}}' is missing.\", arg),")?;
+    writeln!(output, "            ArgParseError::UnknownArgument(arg) => write!(f, \"An unknown argument '{{}}' was specified.\", arg),")?;
+    writeln!(output, "            ArgParseError::BadUtf8(arg) => write!(f, \"The argument '{{}}' doesn't have valid UTF-8 encoding.\", arg),")?;
+    gen_display_arg_parse_error(config, &mut output)?;
+    writeln!(output, "        }}")?;
+    writeln!(output, "    }}")?;
+    writeln!(output, "}}")?;
+    writeln!(output)?;
+    writeln!(output, "impl ::std::fmt::Debug for ArgParseError {{")?;
+    writeln!(output, "    fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {{")?;
+    writeln!(output, "        ::std::fmt::Display::fmt(self, f)")?;
+    writeln!(output, "    }}")?;
+    writeln!(output, "}}")?;
+    writeln!(output)?;
     writeln!(output, "pub enum ValidationError {{")?;
     writeln!(output, "    MissingField(&'static str),")?;
     writeln!(output, "}}")?;
     writeln!(output)?;
-    writeln!(output, "#[derive(Debug)]")?;
+    writeln!(output, "impl ::std::fmt::Display for ValidationError {{")?;
+    writeln!(output, "    fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {{")?;
+    writeln!(output, "        match self {{")?;
+    writeln!(output, "            ValidationError::MissingField(field) => write!(f, \"Configuration parameter '{{}}' not specified.\", field),")?;
+    writeln!(output, "        }}")?;
+    writeln!(output, "    }}")?;
+    writeln!(output, "}}")?;
+    writeln!(output)?;
+    writeln!(output, "impl ::std::fmt::Debug for ValidationError {{")?;
+    writeln!(output, "    fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {{")?;
+    writeln!(output, "        ::std::fmt::Display::fmt(self, f)")?;
+    writeln!(output, "    }}")?;
+    writeln!(output, "}}")?;
+    writeln!(output)?;
     writeln!(output, "pub enum Error {{")?;
-    writeln!(output, "    Reading(::std::io::Error),")?;
-    writeln!(output, "    ConfigParsing(::toml::de::Error),")?;
+    writeln!(output, "    Reading {{ file: ::std::path::PathBuf, error: ::std::io::Error }},")?;
+    writeln!(output, "    ConfigParsing {{ file: ::std::path::PathBuf, error: ::toml::de::Error }},")?;
     writeln!(output, "    Arguments(ArgParseError),")?;
     writeln!(output, "    Validation(ValidationError),")?;
-    writeln!(output, "}}")?;
-    writeln!(output)?;
-    writeln!(output, "impl From<::std::io::Error> for Error {{")?;
-    writeln!(output, "    fn from(err: ::std::io::Error) -> Self {{")?;
-    writeln!(output, "        Error::Reading(err)")?;
-    writeln!(output, "    }}")?;
-    writeln!(output, "}}")?;
-    writeln!(output)?;
-    writeln!(output, "impl From<::toml::de::Error> for Error {{")?;
-    writeln!(output, "    fn from(err: ::toml::de::Error) -> Self {{")?;
-    writeln!(output, "        Error::ConfigParsing(err)")?;
-    writeln!(output, "    }}")?;
     writeln!(output, "}}")?;
     writeln!(output)?;
     writeln!(output, "impl From<ArgParseError> for Error {{")?;
@@ -227,6 +258,23 @@ pub fn generate_code<W: Write>(config: &Config, mut output: W) -> io::Result<()>
     writeln!(output, "    }}")?;
     writeln!(output, "}}")?;
     writeln!(output)?;
+    writeln!(output, "impl ::std::fmt::Display for Error {{")?;
+    writeln!(output, "    fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {{")?;
+    writeln!(output, "        match self {{")?;
+    writeln!(output, "            Error::Reading {{ file, error }} => write!(f, \"Failed to read configuration file {{}}: {{}}\", file.display(), error),")?;
+    writeln!(output, "            Error::ConfigParsing {{ file, error }} => write!(f, \"Failed to parse configuration file {{}}: {{}}\", file.display(), error),")?;
+    writeln!(output, "            Error::Arguments(err) => write!(f, \"{{}}\", err),")?;
+    writeln!(output, "            Error::Validation(err) => write!(f, \"Invalid configuration: {{}}\", err),")?;
+    writeln!(output, "        }}")?;
+    writeln!(output, "    }}")?;
+    writeln!(output, "}}")?;
+    writeln!(output)?;
+    writeln!(output, "impl ::std::fmt::Debug for Error {{")?;
+    writeln!(output, "    fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {{")?;
+    writeln!(output, "        ::std::fmt::Display::fmt(self, f)")?;
+    writeln!(output, "    }}")?;
+    writeln!(output, "}}")?;
+    writeln!(output)?;
     writeln!(output, "mod raw {{")?;
     writeln!(output, "    use ::std::path::PathBuf;")?;
     writeln!(output, "    use super::{{ArgParseError, ValidationError}};")?;
@@ -238,13 +286,13 @@ pub fn generate_code<W: Write>(config: &Config, mut output: W) -> io::Result<()>
     writeln!(output, "    }}")?;
     writeln!(output)?;
     writeln!(output, "    impl Config {{")?;
-    writeln!(output, "        pub fn load<P: AsRef<::std::path::Path>>(config_file: P) -> Result<Self, super::Error> {{")?;
+    writeln!(output, "        pub fn load<P: AsRef<::std::path::Path>>(config_file_name: P) -> Result<Self, super::Error> {{")?;
     writeln!(output, "            use std::io::Read;")?;
     writeln!(output)?;
-    writeln!(output, "            let mut config_file = ::std::fs::File::open(config_file)?;")?;
+    writeln!(output, "            let mut config_file = ::std::fs::File::open(&config_file_name).map_err(|error| super::Error::Reading {{ file: config_file_name.as_ref().into(), error }})?;")?;
     writeln!(output, "            let mut config_content = Vec::new();")?;
-    writeln!(output, "            config_file.read_to_end(&mut config_content)?;")?;
-    writeln!(output, "            ::toml::from_slice(&config_content).map_err(Into::into)")?;
+    writeln!(output, "            config_file.read_to_end(&mut config_content).map_err(|error| super::Error::Reading {{ file: config_file_name.as_ref().into(), error }})?;")?;
+    writeln!(output, "            ::toml::from_slice(&config_content).map_err(|error| super::Error::ConfigParsing {{ file: config_file_name.as_ref().into(), error }})")?;
     writeln!(output, "        }}")?;
     writeln!(output)?;
     writeln!(output, "        pub fn validate(self) -> Result<super::Config, ValidationError> {{")?;
@@ -264,7 +312,7 @@ pub fn generate_code<W: Write>(config: &Config, mut output: W) -> io::Result<()>
     writeln!(output, "                    return Ok(None.into_iter().chain(iter));")?;
     gen_merge_args(config, &mut output)?;
     writeln!(output, "                }} else if arg.to_str().unwrap_or(\"\").starts_with(\"--\") {{")?;
-    writeln!(output, "                    return Err(ArgParseError::UnknownArgument.into());")?;
+    writeln!(output, "                    return Err(ArgParseError::UnknownArgument(arg.into_string().unwrap()).into());")?;
     writeln!(output, "                }} else {{")?;
     writeln!(output, "                    return Ok(Some(arg).into_iter().chain(iter))")?;
     writeln!(output, "                }}")?;
@@ -294,7 +342,7 @@ pub fn generate_code<W: Write>(config: &Config, mut output: W) -> io::Result<()>
     writeln!(output, "        for path in config_files {{")?;
     writeln!(output, "            match raw::Config::load(path) {{")?;
     writeln!(output, "                Ok(new_config) => config.merge_in(new_config),")?;
-    writeln!(output, "                Err(Error::Reading(ref err)) if err.kind() == ::std::io::ErrorKind::NotFound => (),")?;
+    writeln!(output, "                Err(Error::Reading {{ ref error, .. }}) if error.kind() == ::std::io::ErrorKind::NotFound => (),")?;
     writeln!(output, "                Err(err) => return Err(err),")?;
     writeln!(output, "            }}")?;
     writeln!(output, "        }}")?;
