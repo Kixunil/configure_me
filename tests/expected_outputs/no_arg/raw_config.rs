@@ -1,0 +1,1 @@
+        foo: Option<u32>,

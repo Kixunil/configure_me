@@ -1,0 +1,5 @@
+        foo: Option<u32>,
+        bar: Option<String>,
+        baz: Option<String>,
+        verbose: Option<bool>,
+        fast: Option<bool>,

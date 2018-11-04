@@ -16,22 +16,12 @@ fn gen_raw_switches<W: Write>(config: &Config, mut output: W) -> io::Result<()> 
 }
 
 fn gen_raw_config<W: Write>(config: &Config, mut output: W) -> io::Result<()> {
-    writeln!(output, "    #[derive(Deserialize, Default)]")?;
-    writeln!(output, "    pub struct Config {{")?;
-    writeln!(output, "        _program_path: Option<PathBuf>,")?;
     gen_raw_params(config, &mut output)?;
     gen_raw_switches(config, &mut output)?;
-    writeln!(output, "    }}")?;
     Ok(())
 }
 
 fn gen_arg_parse_error<W: Write>(config: &Config, mut output: W) -> io::Result<()> {
-    writeln!(output, "#[derive(Debug)]")?;
-    writeln!(output, "pub enum ArgParseError {{")?;
-    writeln!(output, "    MissingArgument(&'static str),")?;
-    writeln!(output, "    UnknownArgument,")?;
-    writeln!(output, "    BadUtf8(&'static str),")?;
-    writeln!(output)?;
     for param in &config.params {
         if !param.argument {
             continue;
@@ -41,7 +31,6 @@ fn gen_arg_parse_error<W: Write>(config: &Config, mut output: W) -> io::Result<(
         pascal_case(&mut output, &param.name)?;
         writeln!(output, "(<{} as ::std::str::FromStr>::Err),", param.ty)?;
     }
-    writeln!(output, "}}")?;
     Ok(())
 }
 
@@ -92,19 +81,16 @@ fn gen_copy_switches<W: Write>(config: &Config, mut output: W) -> io::Result<()>
 }
 
 fn gen_validation_fn<W: Write>(config: &Config, mut output: W) -> io::Result<()> {
-    writeln!(output, "        pub fn validate(self) -> Result<super::Config, ValidationError> {{")?;
     gen_param_validation(config, &mut output)?;
     writeln!(output)?;
     writeln!(output, "            Ok(super::Config {{")?;
     gen_construct_config_params(config, &mut output)?;
     gen_copy_switches(config, &mut output)?;
     writeln!(output, "            }})")?;
-    writeln!(output, "        }}")?;
     Ok(())
 }
 
 fn gen_merge_in<W: Write>(config: &Config, mut output: W) -> io::Result<()> {
-    writeln!(output, "        pub fn merge_in(&mut self, other: Self) {{")?;
     for param in &config.params {
         writeln!(output, "            if self.{}.is_none() {{", param.name)?;
         writeln!(output, "                self.{} = other.{};", param.name, param.name)?;
@@ -115,7 +101,6 @@ fn gen_merge_in<W: Write>(config: &Config, mut output: W) -> io::Result<()> {
         writeln!(output, "                self.{} = other.{};", switch.name, switch.name)?;
         writeln!(output, "            }}")?;
     }
-    writeln!(output, "        }}")?;
     Ok(())
 }
 
@@ -174,24 +159,8 @@ fn gen_arg_parse_params<W: Write>(config: &Config, mut output: W) -> io::Result<
 }
 
 fn gen_merge_args<W: Write>(config: &Config, mut output: W) -> io::Result<()> {
-    writeln!(output, "        pub fn merge_args<I: IntoIterator<Item=::std::ffi::OsString>>(&mut self, args: I) -> Result<impl Iterator<Item=::std::ffi::OsString>, super::Error> {{")?;
-    writeln!(output, "            let mut iter = args.into_iter().fuse();")?;
-    writeln!(output, "            self._program_path = iter.next().map(Into::into);")?;
-    writeln!(output)?;
-    writeln!(output, "            while let Some(arg) = iter.next() {{")?;
-    writeln!(output, "                if arg == *\"--\" {{")?;
-    writeln!(output, "                    return Ok(None.into_iter().chain(iter));")?;
     gen_arg_parse_params(config, &mut output)?;
     gen_arg_parse_switches(config, &mut output)?;
-    writeln!(output, "                }} else if arg.to_str().unwrap_or(\"\").starts_with(\"--\") {{")?;
-    writeln!(output, "                    return Err(ArgParseError::UnknownArgument.into());")?;
-    writeln!(output, "                }} else {{")?;
-    writeln!(output, "                    return Ok(Some(arg).into_iter().chain(iter))")?;
-    writeln!(output, "                }}")?;
-    writeln!(output, "            }}")?;
-    writeln!(output)?;
-    writeln!(output, "            Ok(None.into_iter().chain(iter))")?;
-    writeln!(output, "        }}")?;
     Ok(())
 }
 
@@ -213,11 +182,18 @@ fn gen_arg_parse_switches<W: Write>(config: &Config, mut output: W) -> io::Resul
 
 pub fn generate_code<W: Write>(config: &Config, mut output: W) -> io::Result<()> {
     writeln!(output, "#[derive(Debug)]")?;
+    writeln!(output, "pub enum ArgParseError {{")?;
+    writeln!(output, "    MissingArgument(&'static str),")?;
+    writeln!(output, "    UnknownArgument,")?;
+    writeln!(output, "    BadUtf8(&'static str),")?;
+    writeln!(output)?;
+    gen_arg_parse_error(config, &mut output)?;
+    writeln!(output, "}}")?;
+    writeln!(output)?;
+    writeln!(output, "#[derive(Debug)]")?;
     writeln!(output, "pub enum ValidationError {{")?;
     writeln!(output, "    MissingField(&'static str),")?;
     writeln!(output, "}}")?;
-    writeln!(output)?;
-    gen_arg_parse_error(config, &mut output)?;
     writeln!(output)?;
     writeln!(output, "#[derive(Debug)]")?;
     writeln!(output, "pub enum Error {{")?;
@@ -254,7 +230,12 @@ pub fn generate_code<W: Write>(config: &Config, mut output: W) -> io::Result<()>
     writeln!(output, "mod raw {{")?;
     writeln!(output, "    use ::std::path::PathBuf;")?;
     writeln!(output, "    use super::{{ArgParseError, ValidationError}};")?;
+    writeln!(output)?;
+    writeln!(output, "    #[derive(Deserialize, Default)]")?;
+    writeln!(output, "    pub struct Config {{")?;
+    writeln!(output, "        _program_path: Option<PathBuf>,")?;
     gen_raw_config(config, &mut output)?;
+    writeln!(output, "    }}")?;
     writeln!(output)?;
     writeln!(output, "    impl Config {{")?;
     writeln!(output, "        pub fn load<P: AsRef<::std::path::Path>>(config_file: P) -> Result<Self, super::Error> {{")?;
@@ -266,11 +247,31 @@ pub fn generate_code<W: Write>(config: &Config, mut output: W) -> io::Result<()>
     writeln!(output, "            ::toml::from_slice(&config_content).map_err(Into::into)")?;
     writeln!(output, "        }}")?;
     writeln!(output)?;
+    writeln!(output, "        pub fn validate(self) -> Result<super::Config, ValidationError> {{")?;
     gen_validation_fn(config, &mut output)?;
+    writeln!(output, "        }}")?;
     writeln!(output)?;
+    writeln!(output, "        pub fn merge_in(&mut self, other: Self) {{")?;
     gen_merge_in(config, &mut output)?;
+    writeln!(output, "        }}")?;
     writeln!(output)?;
+    writeln!(output, "        pub fn merge_args<I: IntoIterator<Item=::std::ffi::OsString>>(&mut self, args: I) -> Result<impl Iterator<Item=::std::ffi::OsString>, super::Error> {{")?;
+    writeln!(output, "            let mut iter = args.into_iter().fuse();")?;
+    writeln!(output, "            self._program_path = iter.next().map(Into::into);")?;
+    writeln!(output)?;
+    writeln!(output, "            while let Some(arg) = iter.next() {{")?;
+    writeln!(output, "                if arg == *\"--\" {{")?;
+    writeln!(output, "                    return Ok(None.into_iter().chain(iter));")?;
     gen_merge_args(config, &mut output)?;
+    writeln!(output, "                }} else if arg.to_str().unwrap_or(\"\").starts_with(\"--\") {{")?;
+    writeln!(output, "                    return Err(ArgParseError::UnknownArgument.into());")?;
+    writeln!(output, "                }} else {{")?;
+    writeln!(output, "                    return Ok(Some(arg).into_iter().chain(iter))")?;
+    writeln!(output, "                }}")?;
+    writeln!(output, "            }}")?;
+    writeln!(output)?;
+    writeln!(output, "            Ok(None.into_iter().chain(iter))")?;
+    writeln!(output, "        }}")?;
     writeln!(output, "    }}")?;
     writeln!(output, "}}")?;
     writeln!(output)?;
@@ -357,15 +358,7 @@ mod tests {
 
     #[test]
     fn empty_arg_parse_error() {
-        let expected =
-r#"#[derive(Debug)]
-pub enum ArgParseError {
-    MissingArgument(&'static str),
-    UnknownArgument,
-    BadUtf8(&'static str),
-
-}
-"#;
+        let expected = "";
         check!(gen_arg_parse_error, &config_empty(), expected);
     }
 

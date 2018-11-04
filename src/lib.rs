@@ -237,598 +237,50 @@ argument = false
         pub arg_parse_error: &'static str,
     }
 
-    impl ExpectedOutput {
-        fn complete(&self) -> String {
-            format!(
-r#"#[derive(Debug)]
-pub enum ValidationError {{
-    MissingField(&'static str),
-}}
-
-{}
-#[derive(Debug)]
-pub enum Error {{
-    Reading(::std::io::Error),
-    ConfigParsing(::toml::de::Error),
-    Arguments(ArgParseError),
-    Validation(ValidationError),
-}}
-
-impl From<::std::io::Error> for Error {{
-    fn from(err: ::std::io::Error) -> Self {{
-        Error::Reading(err)
-    }}
-}}
-
-impl From<::toml::de::Error> for Error {{
-    fn from(err: ::toml::de::Error) -> Self {{
-        Error::ConfigParsing(err)
-    }}
-}}
-
-impl From<ArgParseError> for Error {{
-    fn from(err: ArgParseError) -> Self {{
-        Error::Arguments(err)
-    }}
-}}
-
-impl From<ValidationError> for Error {{
-    fn from(err: ValidationError) -> Self {{
-        Error::Validation(err)
-    }}
-}}
-
-mod raw {{
-    use ::std::path::PathBuf;
-    use super::{{ArgParseError, ValidationError}};
-{}
-    impl Config {{
-        pub fn load<P: AsRef<::std::path::Path>>(config_file: P) -> Result<Self, super::Error> {{
-            use std::io::Read;
-
-            let mut config_file = ::std::fs::File::open(config_file)?;
-            let mut config_content = Vec::new();
-            config_file.read_to_end(&mut config_content)?;
-            ::toml::from_slice(&config_content).map_err(Into::into)
-        }}
-
-{}
-{}
-{}    }}
-}}
-
-{}
-impl Config {{
-    pub fn including_optional_config_files<I>(config_files: I) -> Result<(Self, impl Iterator<Item=::std::ffi::OsString>), Error> where I: IntoIterator, I::Item: AsRef<::std::path::Path> {{
-        let mut config = raw::Config::default();
-        for path in config_files {{
-            match raw::Config::load(path) {{
-                Ok(new_config) => config.merge_in(new_config),
-                Err(Error::Reading(ref err)) if err.kind() == ::std::io::ErrorKind::NotFound => (),
-                Err(err) => return Err(err),
-            }}
-        }}
-        let remaining_args = config.merge_args(::std::env::args_os())?;
-        config
-            .validate()
-            .map(|cfg| (cfg, remaining_args))
-            .map_err(Into::into)
-    }}
-}}
-"#,
-            self.arg_parse_error,
-            self.raw_config,
-            self.validate,
-            self.merge_in,
-            self.merge_args,
-            self.config
-                   )
-        }
-    }
-
     pub const EXPECTED_EMPTY: ExpectedOutput = ExpectedOutput {
-        raw_config:
-r#"    #[derive(Deserialize, Default)]
-    pub struct Config {
-        _program_path: Option<PathBuf>,
-    }
-"#,
-        validate:
-r#"        pub fn validate(self) -> Result<super::Config, ValidationError> {
-
-            Ok(super::Config {
-            })
-        }
-"#,
-        merge_in:
-r#"        pub fn merge_in(&mut self, other: Self) {
-        }
-"#,
-        merge_args:
-r#"        pub fn merge_args<I: IntoIterator<Item=::std::ffi::OsString>>(&mut self, args: I) -> Result<impl Iterator<Item=::std::ffi::OsString>, super::Error> {
-            let mut iter = args.into_iter().fuse();
-            self._program_path = iter.next().map(Into::into);
-
-            while let Some(arg) = iter.next() {
-                if arg == *"--" {
-                    return Ok(None.into_iter().chain(iter));
-                } else if arg.to_str().unwrap_or("").starts_with("--") {
-                    return Err(ArgParseError::UnknownArgument.into());
-                } else {
-                    return Ok(Some(arg).into_iter().chain(iter))
-                }
-            }
-
-            Ok(None.into_iter().chain(iter))
-        }
-"#,
-        config:
-r#"/// Configuration of the application
-pub struct Config {
-}
-"#,
-        arg_parse_error:
-r#"#[derive(Debug)]
-pub enum ArgParseError {
-    MissingArgument(&'static str),
-    UnknownArgument,
-    BadUtf8(&'static str),
-
-}
-"#,
+        raw_config: include_str!("../tests/expected_outputs/empty/raw_config.rs"),
+        validate: include_str!("../tests/expected_outputs/empty/validate.rs"),
+        merge_in: include_str!("../tests/expected_outputs/empty/merge_in.rs"),
+        merge_args: include_str!("../tests/expected_outputs/empty/merge_args.rs"),
+        config: include_str!("../tests/expected_outputs/empty/config.rs"),
+        arg_parse_error: include_str!("../tests/expected_outputs/empty/arg_parse_error.rs"),
     };
 
     pub const EXPECTED_SINGLE_OPTIONAL_PARAM: ExpectedOutput = ExpectedOutput {
-        raw_config:
-r#"    #[derive(Deserialize, Default)]
-    pub struct Config {
-        _program_path: Option<PathBuf>,
-        foo: Option<u32>,
-    }
-"#,
-        validate:
-r#"        pub fn validate(self) -> Result<super::Config, ValidationError> {
-            let foo = self.foo;
-
-            Ok(super::Config {
-                foo,
-            })
-        }
-"#,
-        merge_in:
-r#"        pub fn merge_in(&mut self, other: Self) {
-            if self.foo.is_none() {
-                self.foo = other.foo;
-            }
-        }
-"#,
-        merge_args:
-r#"        pub fn merge_args<I: IntoIterator<Item=::std::ffi::OsString>>(&mut self, args: I) -> Result<impl Iterator<Item=::std::ffi::OsString>, super::Error> {
-            let mut iter = args.into_iter().fuse();
-            self._program_path = iter.next().map(Into::into);
-
-            while let Some(arg) = iter.next() {
-                if arg == *"--" {
-                    return Ok(None.into_iter().chain(iter));
-                } else if arg == *"--foo" {
-                    let foo = iter.next().ok_or(ArgParseError::MissingArgument("--foo"))?;
-
-                    let foo = foo
-                        .to_str()
-                        .ok_or(ArgParseError::BadUtf8("--foo"))?
-                        .parse()
-                        .map_err(ArgParseError::FieldFoo)?;
-
-                    self.foo = Some(foo);
-                } else if arg.to_str().unwrap_or("").starts_with("--") {
-                    return Err(ArgParseError::UnknownArgument.into());
-                } else {
-                    return Ok(Some(arg).into_iter().chain(iter))
-                }
-            }
-
-            Ok(None.into_iter().chain(iter))
-        }
-"#,
-        config:
-r#"/// Configuration of the application
-pub struct Config {
-    pub foo: Option<u32>,
-}
-"#,
-        arg_parse_error:
-r#"#[derive(Debug)]
-pub enum ArgParseError {
-    MissingArgument(&'static str),
-    UnknownArgument,
-    BadUtf8(&'static str),
-
-    FieldFoo(<u32 as ::std::str::FromStr>::Err),
-}
-"#,
+        raw_config: include_str!("../tests/expected_outputs/single_optional_param/raw_config.rs"),
+        validate: include_str!("../tests/expected_outputs/single_optional_param/validate.rs"),
+        merge_in: include_str!("../tests/expected_outputs/single_optional_param/merge_in.rs"),
+        merge_args: include_str!("../tests/expected_outputs/single_optional_param/merge_args.rs"),
+        config: include_str!("../tests/expected_outputs/single_optional_param/config.rs"),
+        arg_parse_error: include_str!("../tests/expected_outputs/single_optional_param/arg_parse_error.rs"),
     };
 
     pub const EXPECTED_SINGLE_MANDATORY_PARAM: ExpectedOutput = ExpectedOutput {
-        raw_config:
-r#"    #[derive(Deserialize, Default)]
-    pub struct Config {
-        _program_path: Option<PathBuf>,
-        foo: Option<u32>,
-    }
-"#,
-        validate:
-r#"        pub fn validate(self) -> Result<super::Config, ValidationError> {
-            let foo = self.foo.ok_or(ValidationError::MissingField("foo"))?;
-
-            Ok(super::Config {
-                foo,
-            })
-        }
-"#,
-        merge_in:
-r#"        pub fn merge_in(&mut self, other: Self) {
-            if self.foo.is_none() {
-                self.foo = other.foo;
-            }
-        }
-"#,
-        merge_args:
-r#"        pub fn merge_args<I: IntoIterator<Item=::std::ffi::OsString>>(&mut self, args: I) -> Result<impl Iterator<Item=::std::ffi::OsString>, super::Error> {
-            let mut iter = args.into_iter().fuse();
-            self._program_path = iter.next().map(Into::into);
-
-            while let Some(arg) = iter.next() {
-                if arg == *"--" {
-                    return Ok(None.into_iter().chain(iter));
-                } else if arg == *"--foo" {
-                    let foo = iter.next().ok_or(ArgParseError::MissingArgument("--foo"))?;
-
-                    let foo = foo
-                        .to_str()
-                        .ok_or(ArgParseError::BadUtf8("--foo"))?
-                        .parse()
-                        .map_err(ArgParseError::FieldFoo)?;
-
-                    self.foo = Some(foo);
-                } else if arg.to_str().unwrap_or("").starts_with("--") {
-                    return Err(ArgParseError::UnknownArgument.into());
-                } else {
-                    return Ok(Some(arg).into_iter().chain(iter))
-                }
-            }
-
-            Ok(None.into_iter().chain(iter))
-        }
-"#,
-        config:
-r#"/// Configuration of the application
-pub struct Config {
-    pub foo: u32,
-}
-"#,
-        arg_parse_error:
-r#"#[derive(Debug)]
-pub enum ArgParseError {
-    MissingArgument(&'static str),
-    UnknownArgument,
-    BadUtf8(&'static str),
-
-    FieldFoo(<u32 as ::std::str::FromStr>::Err),
-}
-"#,
+        raw_config: include_str!("../tests/expected_outputs/single_mandatory_param/raw_config.rs"),
+        validate: include_str!("../tests/expected_outputs/single_mandatory_param/validate.rs"),
+        merge_in: include_str!("../tests/expected_outputs/single_mandatory_param/merge_in.rs"),
+        merge_args: include_str!("../tests/expected_outputs/single_mandatory_param/merge_args.rs"),
+        config: include_str!("../tests/expected_outputs/single_mandatory_param/config.rs"),
+        arg_parse_error: include_str!("../tests/expected_outputs/single_mandatory_param/arg_parse_error.rs"),
     };
 
     pub const EXPECTED_SINGLE_DEFAULT_PARAM: ExpectedOutput = ExpectedOutput {
-        raw_config:
-r#"    #[derive(Deserialize, Default)]
-    pub struct Config {
-        _program_path: Option<PathBuf>,
-        foo: Option<u32>,
-    }
-"#,
-        validate:
-r#"        pub fn validate(self) -> Result<super::Config, ValidationError> {
-            let foo = self.foo.unwrap_or_else(|| { 42 });
-
-            Ok(super::Config {
-                foo,
-            })
-        }
-"#,
-        merge_in:
-r#"        pub fn merge_in(&mut self, other: Self) {
-            if self.foo.is_none() {
-                self.foo = other.foo;
-            }
-        }
-"#,
-        merge_args:
-r#"        pub fn merge_args<I: IntoIterator<Item=::std::ffi::OsString>>(&mut self, args: I) -> Result<impl Iterator<Item=::std::ffi::OsString>, super::Error> {
-            let mut iter = args.into_iter().fuse();
-            self._program_path = iter.next().map(Into::into);
-
-            while let Some(arg) = iter.next() {
-                if arg == *"--" {
-                    return Ok(None.into_iter().chain(iter));
-                } else if arg == *"--foo" {
-                    let foo = iter.next().ok_or(ArgParseError::MissingArgument("--foo"))?;
-
-                    let foo = foo
-                        .to_str()
-                        .ok_or(ArgParseError::BadUtf8("--foo"))?
-                        .parse()
-                        .map_err(ArgParseError::FieldFoo)?;
-
-                    self.foo = Some(foo);
-                } else if arg.to_str().unwrap_or("").starts_with("--") {
-                    return Err(ArgParseError::UnknownArgument.into());
-                } else {
-                    return Ok(Some(arg).into_iter().chain(iter))
-                }
-            }
-
-            Ok(None.into_iter().chain(iter))
-        }
-"#,
-        config:
-r#"/// Configuration of the application
-pub struct Config {
-    pub foo: u32,
-}
-"#,
-        arg_parse_error:
-r#"#[derive(Debug)]
-pub enum ArgParseError {
-    MissingArgument(&'static str),
-    UnknownArgument,
-    BadUtf8(&'static str),
-
-    FieldFoo(<u32 as ::std::str::FromStr>::Err),
-}
-"#,
+        raw_config: include_str!("../tests/expected_outputs/single_default_param/raw_config.rs"),
+        validate: include_str!("../tests/expected_outputs/single_default_param/validate.rs"),
+        merge_in: include_str!("../tests/expected_outputs/single_default_param/merge_in.rs"),
+        merge_args: include_str!("../tests/expected_outputs/single_default_param/merge_args.rs"),
+        config: include_str!("../tests/expected_outputs/single_default_param/config.rs"),
+        arg_parse_error: include_str!("../tests/expected_outputs/single_default_param/arg_parse_error.rs"),
     };
 
     pub const EXPECTED_SINGLE_SWITCH: ExpectedOutput = ExpectedOutput {
-        raw_config:
-r#"    #[derive(Deserialize, Default)]
-    pub struct Config {
-        _program_path: Option<PathBuf>,
-        foo: Option<bool>,
-    }
-"#,
-        validate:
-r#"        pub fn validate(self) -> Result<super::Config, ValidationError> {
-
-            Ok(super::Config {
-                foo: self.foo.unwrap_or(false),
-            })
-        }
-"#,
-        merge_in:
-r#"        pub fn merge_in(&mut self, other: Self) {
-            if self.foo.is_none() {
-                self.foo = other.foo;
-            }
-        }
-"#,
-        merge_args:
-r#"        pub fn merge_args<I: IntoIterator<Item=::std::ffi::OsString>>(&mut self, args: I) -> Result<impl Iterator<Item=::std::ffi::OsString>, super::Error> {
-            let mut iter = args.into_iter().fuse();
-            self._program_path = iter.next().map(Into::into);
-
-            while let Some(arg) = iter.next() {
-                if arg == *"--" {
-                    return Ok(None.into_iter().chain(iter));
-                } else if arg == *"--foo" {
-                    self.foo = Some(true);
-                } else if arg.to_str().unwrap_or("").starts_with("--") {
-                    return Err(ArgParseError::UnknownArgument.into());
-                } else {
-                    return Ok(Some(arg).into_iter().chain(iter))
-                }
-            }
-
-            Ok(None.into_iter().chain(iter))
-        }
-"#,
-        config:
-r#"/// Configuration of the application
-pub struct Config {
-    pub foo: bool,
-}
-"#,
-        arg_parse_error:
-r#"#[derive(Debug)]
-pub enum ArgParseError {
-    MissingArgument(&'static str),
-    UnknownArgument,
-    BadUtf8(&'static str),
-
-}
-"#,
+        raw_config: include_str!("../tests/expected_outputs/single_switch/raw_config.rs"),
+        validate: include_str!("../tests/expected_outputs/single_switch/validate.rs"),
+        merge_in: include_str!("../tests/expected_outputs/single_switch/merge_in.rs"),
+        merge_args: include_str!("../tests/expected_outputs/single_switch/merge_args.rs"),
+        config: include_str!("../tests/expected_outputs/single_switch/config.rs"),
+        arg_parse_error: include_str!("../tests/expected_outputs/single_switch/arg_parse_error.rs"),
     };
-
-    pub const EXPECTED_MULTIPLE_PARAMS: ExpectedOutput = ExpectedOutput {
-        raw_config:
-r#"    #[derive(Deserialize, Default)]
-    pub struct Config {
-        _program_path: Option<PathBuf>,
-        foo: Option<u32>,
-        bar: Option<String>,
-        baz: Option<String>,
-        verbose: Option<bool>,
-        fast: Option<bool>,
-    }
-"#,
-        validate:
-r#"        pub fn validate(self) -> Result<super::Config, ValidationError> {
-            let foo = self.foo.unwrap_or_else(|| { 42 });
-            let bar = self.bar;
-            let baz = self.baz.ok_or(ValidationError::MissingField("baz"))?;
-
-            Ok(super::Config {
-                foo,
-                bar,
-                baz,
-                verbose: self.verbose.unwrap_or(false),
-                fast: self.fast.unwrap_or(true),
-            })
-        }
-"#,
-        merge_in:
-r#"        pub fn merge_in(&mut self, other: Self) {
-            if self.foo.is_none() {
-                self.foo = other.foo;
-            }
-            if self.bar.is_none() {
-                self.bar = other.bar;
-            }
-            if self.baz.is_none() {
-                self.baz = other.baz;
-            }
-            if self.verbose.is_none() {
-                self.verbose = other.verbose;
-            }
-            if self.fast.is_none() {
-                self.fast = other.fast;
-            }
-        }
-"#,
-        merge_args:
-r#"        pub fn merge_args<I: IntoIterator<Item=::std::ffi::OsString>>(&mut self, args: I) -> Result<impl Iterator<Item=::std::ffi::OsString>, super::Error> {
-            let mut iter = args.into_iter().fuse();
-            self._program_path = iter.next().map(Into::into);
-
-            while let Some(arg) = iter.next() {
-                if arg == *"--" {
-                    return Ok(None.into_iter().chain(iter));
-                } else if arg == *"--foo" {
-                    let foo = iter.next().ok_or(ArgParseError::MissingArgument("--foo"))?;
-
-                    let foo = foo
-                        .to_str()
-                        .ok_or(ArgParseError::BadUtf8("--foo"))?
-                        .parse()
-                        .map_err(ArgParseError::FieldFoo)?;
-
-                    self.foo = Some(foo);
-                } else if arg == *"--bar" {
-                    let bar = iter.next().ok_or(ArgParseError::MissingArgument("--bar"))?;
-
-                    let bar = bar
-                        .to_str()
-                        .ok_or(ArgParseError::BadUtf8("--bar"))?
-                        .parse()
-                        .map_err(ArgParseError::FieldBar)?;
-
-                    self.bar = Some(bar);
-                } else if arg == *"--baz" {
-                    let baz = iter.next().ok_or(ArgParseError::MissingArgument("--baz"))?;
-
-                    let baz = baz
-                        .to_str()
-                        .ok_or(ArgParseError::BadUtf8("--baz"))?
-                        .parse()
-                        .map_err(ArgParseError::FieldBaz)?;
-
-                    self.baz = Some(baz);
-                } else if arg == *"--verbose" {
-                    self.verbose = Some(true);
-                } else if arg == *"--no-fast" {
-                    self.fast = Some(false);
-                } else if arg.to_str().unwrap_or("").starts_with("--") {
-                    return Err(ArgParseError::UnknownArgument.into());
-                } else {
-                    return Ok(Some(arg).into_iter().chain(iter))
-                }
-            }
-
-            Ok(None.into_iter().chain(iter))
-        }
-"#,
-        config:
-r#"/// Configuration of the application
-pub struct Config {
-    pub foo: u32,
-    pub bar: Option<String>,
-    pub baz: String,
-    pub verbose: bool,
-    pub fast: bool,
-}
-"#,
-        arg_parse_error:
-r#"#[derive(Debug)]
-pub enum ArgParseError {
-    MissingArgument(&'static str),
-    UnknownArgument,
-    BadUtf8(&'static str),
-
-    FieldFoo(<u32 as ::std::str::FromStr>::Err),
-    FieldBar(<String as ::std::str::FromStr>::Err),
-    FieldBaz(<String as ::std::str::FromStr>::Err),
-}
-"#,
-    };
-
-    pub const EXPECTED_NO_ARG: ExpectedOutput = ExpectedOutput {
-        raw_config:
-r#"    #[derive(Deserialize, Default)]
-    pub struct Config {
-        _program_path: Option<PathBuf>,
-        foo: Option<u32>,
-    }
-"#,
-        validate:
-r#"        pub fn validate(self) -> Result<super::Config, ValidationError> {
-            let foo = self.foo;
-
-            Ok(super::Config {
-                foo,
-            })
-        }
-"#,
-        merge_in:
-r#"        pub fn merge_in(&mut self, other: Self) {
-            if self.foo.is_none() {
-                self.foo = other.foo;
-            }
-        }
-"#,
-        merge_args:
-r#"        pub fn merge_args<I: IntoIterator<Item=::std::ffi::OsString>>(&mut self, args: I) -> Result<impl Iterator<Item=::std::ffi::OsString>, super::Error> {
-            let mut iter = args.into_iter().fuse();
-            self._program_path = iter.next().map(Into::into);
-
-            while let Some(arg) = iter.next() {
-                if arg == *"--" {
-                    return Ok(None.into_iter().chain(iter));
-                } else if arg.to_str().unwrap_or("").starts_with("--") {
-                    return Err(ArgParseError::UnknownArgument.into());
-                } else {
-                    return Ok(Some(arg).into_iter().chain(iter))
-                }
-            }
-
-            Ok(None.into_iter().chain(iter))
-        }
-"#,
-        config:
-r#"/// Configuration of the application
-pub struct Config {
-    pub foo: Option<u32>,
-}
-"#,
-        arg_parse_error:
-r#"#[derive(Debug)]
-pub enum ArgParseError {
-    MissingArgument(&'static str),
-    UnknownArgument,
-    BadUtf8(&'static str),
-
-}
-"#,
-    };
-
 
     fn check(src: &str, expected: &str) {
         let mut src = src.as_bytes();
@@ -839,36 +291,36 @@ pub enum ArgParseError {
 
     #[test]
     fn empty() {
-        check("", &EXPECTED_EMPTY.complete());
+        check("", include_str!(concat!(env!("OUT_DIR"), "/expected_outputs/empty-config.rs")));
     }
 
     #[test]
     fn single_optional_param() {
-        check(SINGLE_OPTIONAL_PARAM, &EXPECTED_SINGLE_OPTIONAL_PARAM.complete());
+        check(SINGLE_OPTIONAL_PARAM, include_str!(concat!(env!("OUT_DIR"), "/expected_outputs/single_optional_param-config.rs")));
     }
 
     #[test]
     fn single_mandatory_param() {
-        check(SINGLE_MANDATORY_PARAM, &EXPECTED_SINGLE_MANDATORY_PARAM.complete());
+        check(SINGLE_MANDATORY_PARAM, include_str!(concat!(env!("OUT_DIR"), "/expected_outputs/single_mandatory_param-config.rs")));
     }
 
     #[test]
     fn single_default_param() {
-        check(SINGLE_DEFAULT_PARAM, &EXPECTED_SINGLE_DEFAULT_PARAM.complete());
+        check(SINGLE_DEFAULT_PARAM, include_str!(concat!(env!("OUT_DIR"), "/expected_outputs/single_default_param-config.rs")));
     }
 
     #[test]
     fn single_switch() {
-        check(SINGLE_SWITCH, &EXPECTED_SINGLE_SWITCH.complete());
+        check(SINGLE_SWITCH, include_str!(concat!(env!("OUT_DIR"), "/expected_outputs/single_switch-config.rs")));
     }
 
     #[test]
     fn multiple_params() {
-        check(MULTIPLE_PARAMS, &EXPECTED_MULTIPLE_PARAMS.complete());
+        check(MULTIPLE_PARAMS, include_str!(concat!(env!("OUT_DIR"), "/expected_outputs/multiple_params-config.rs")));
     }
 
     #[test]
     fn no_arg() {
-        check(NO_ARG, &EXPECTED_NO_ARG.complete());
+        check(NO_ARG, include_str!(concat!(env!("OUT_DIR"), "/expected_outputs/no_arg-config.rs")));
     }
 }

@@ -1,0 +1,5 @@
+    pub foo: u32,
+    pub bar: Option<String>,
+    pub baz: String,
+    pub verbose: bool,
+    pub fast: bool,
