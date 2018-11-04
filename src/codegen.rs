@@ -283,6 +283,13 @@ pub fn generate_code<W: Write>(config: &Config, mut output: W) -> io::Result<()>
     writeln!(output)?;
     writeln!(output, "impl Config {{")?;
     writeln!(output, "    pub fn including_optional_config_files<I>(config_files: I) -> Result<(Self, impl Iterator<Item=::std::ffi::OsString>), Error> where I: IntoIterator, I::Item: AsRef<::std::path::Path> {{")?;
+    writeln!(output, "        Config::custom_args_and_optional_files(::std::env::args_os(), config_files)")?;
+    writeln!(output, "    }}")?;
+    writeln!(output)?;
+    writeln!(output, "    pub fn custom_args_and_optional_files<A, I>(args: A, config_files: I) -> Result<(Self, impl Iterator<Item=::std::ffi::OsString>), Error> where")?;
+    writeln!(output, "        A: IntoIterator, A::Item: Into<::std::ffi::OsString>,")?;
+    writeln!(output, "        I: IntoIterator, I::Item: AsRef<::std::path::Path> {{")?;
+    writeln!(output)?;
     writeln!(output, "        let mut config = raw::Config::default();")?;
     writeln!(output, "        for path in config_files {{")?;
     writeln!(output, "            match raw::Config::load(path) {{")?;
@@ -291,7 +298,7 @@ pub fn generate_code<W: Write>(config: &Config, mut output: W) -> io::Result<()>
     writeln!(output, "                Err(err) => return Err(err),")?;
     writeln!(output, "            }}")?;
     writeln!(output, "        }}")?;
-    writeln!(output, "        let remaining_args = config.merge_args(::std::env::args_os())?;")?;
+    writeln!(output, "        let remaining_args = config.merge_args(args.into_iter().map(Into::into))?;")?;
     writeln!(output, "        config")?;
     writeln!(output, "            .validate()")?;
     writeln!(output, "            .map(|cfg| (cfg, remaining_args))")?;

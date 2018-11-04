@@ -99,6 +99,13 @@ pub struct Config {
 
 impl Config {
     pub fn including_optional_config_files<I>(config_files: I) -> Result<(Self, impl Iterator<Item=::std::ffi::OsString>), Error> where I: IntoIterator, I::Item: AsRef<::std::path::Path> {
+        Config::custom_args_and_optional_files(::std::env::args_os(), config_files)
+    }
+
+    pub fn custom_args_and_optional_files<A, I>(args: A, config_files: I) -> Result<(Self, impl Iterator<Item=::std::ffi::OsString>), Error> where
+        A: IntoIterator, A::Item: Into<::std::ffi::OsString>,
+        I: IntoIterator, I::Item: AsRef<::std::path::Path> {
+
         let mut config = raw::Config::default();
         for path in config_files {
             match raw::Config::load(path) {
@@ -107,7 +114,7 @@ impl Config {
                 Err(err) => return Err(err),
             }
         }
-        let remaining_args = config.merge_args(::std::env::args_os())?;
+        let remaining_args = config.merge_args(args.into_iter().map(Into::into))?;
         config
             .validate()
             .map(|cfg| (cfg, remaining_args))
