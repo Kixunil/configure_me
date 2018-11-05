@@ -29,13 +29,13 @@ fn help_multiple_params() {
 #[test]
 #[ignore]
 fn process_help() {
-    use config::ResultExt;
-    let _ = config::Config::custom_args_and_optional_files(&["miner", "--help"], iter::empty::<PathBuf>()).unwrap_or_exit();
+    use config::prelude::*;
+    let _ = Config::custom_args_and_optional_files(&["miner", "--help"], iter::empty::<PathBuf>()).unwrap_or_exit();
 }
 
 #[test]
 #[ignore]
 fn process_error() {
-    use config::ResultExt;
-    let _ = config::Config::custom_args_and_optional_files(&["miner", "--foo"], iter::empty::<PathBuf>()).unwrap_or_exit();
+    use config::prelude::*;
+    let _ = Config::custom_args_and_optional_files(&["miner", "--foo"], iter::empty::<PathBuf>()).unwrap_or_exit();
 }

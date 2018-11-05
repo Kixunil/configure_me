@@ -274,6 +274,10 @@ fn gen_arg_parse_switches<W: Write>(config: &Config, mut output: W) -> io::Resul
 }
 
 pub fn generate_code<W: Write>(config: &Config, mut output: W) -> io::Result<()> {
+    writeln!(output, "pub mod prelude {{")?;
+    writeln!(output, "    pub use super::{{Config, ResultExt}};")?;
+    writeln!(output, "}}")?;
+    writeln!(output)?;
     writeln!(output, "pub enum ArgParseError {{")?;
     writeln!(output, "    MissingArgument(&'static str),")?;
     writeln!(output, "    UnknownArgument(String),")?;
