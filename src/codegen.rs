@@ -419,6 +419,9 @@ pub fn generate_code<W: Write>(config: &Config, mut output: W) -> io::Result<()>
     writeln!(output, "        A: IntoIterator, A::Item: Into<::std::ffi::OsString>,")?;
     writeln!(output, "        I: IntoIterator, I::Item: AsRef<::std::path::Path> {{")?;
     writeln!(output)?;
+    writeln!(output, "        let mut arg_cfg = raw::Config::default();")?;
+    writeln!(output, "        let remaining_args = arg_cfg.merge_args(args.into_iter().map(Into::into))?;")?;
+    writeln!(output)?;
     writeln!(output, "        let mut config = raw::Config::default();")?;
     writeln!(output, "        for path in config_files {{")?;
     writeln!(output, "            match raw::Config::load(path) {{")?;
@@ -427,7 +430,9 @@ pub fn generate_code<W: Write>(config: &Config, mut output: W) -> io::Result<()>
     writeln!(output, "                Err(err) => return Err(err),")?;
     writeln!(output, "            }}")?;
     writeln!(output, "        }}")?;
-    writeln!(output, "        let remaining_args = config.merge_args(args.into_iter().map(Into::into))?;")?;
+    writeln!(output)?;
+    writeln!(output, "        config.merge_in(arg_cfg);")?;
+    writeln!(output)?;
     writeln!(output, "        config")?;
     writeln!(output, "            .validate()")?;
     writeln!(output, "            .map(|cfg| (cfg, remaining_args))")?;

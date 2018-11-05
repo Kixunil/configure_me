@@ -142,6 +142,9 @@ impl Config {
         A: IntoIterator, A::Item: Into<::std::ffi::OsString>,
         I: IntoIterator, I::Item: AsRef<::std::path::Path> {
 
+        let mut arg_cfg = raw::Config::default();
+        let remaining_args = arg_cfg.merge_args(args.into_iter().map(Into::into))?;
+
         let mut config = raw::Config::default();
         for path in config_files {
             match raw::Config::load(path) {
@@ -150,7 +153,9 @@ impl Config {
                 Err(err) => return Err(err),
             }
         }
-        let remaining_args = config.merge_args(args.into_iter().map(Into::into))?;
+
+        config.merge_in(arg_cfg);
+
         config
             .validate()
             .map(|cfg| (cfg, remaining_args))
