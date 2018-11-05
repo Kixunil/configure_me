@@ -108,6 +108,7 @@ extern crate toml;
 #[cfg(test)]
 #[macro_use]
 extern crate pretty_assertions;
+extern crate unicode_segmentation;
 
 pub(crate) mod config;
 pub(crate) mod codegen;
@@ -204,23 +205,28 @@ r#"
 name = "foo"
 type = "u32"
 default = "42"
+doc = "A foo"
 
 [[param]]
 name = "bar"
 type = "String"
 optional = true
+doc = "A very, very, very, very, very, very, very, very, very, very, very, very, very, very long documentation..."
 
 [[param]]
 name = "baz"
 type = "String"
 optional = false
+doc = "A much, much, much, much, much, much, much, much, much, much, much, much, much, much, much, much, much, much, much, much, much, much, much, much, much, much, much, much, much, much, much, much, much, much, much, much, much, much, much, much, much, much longer documentation..."
 
 [[switch]]
 name = "verbose"
+# doc intentionally missing, because it's obious...
 
 [[switch]]
 name = "fast"
 default = true
+doc = "Determines whether to mine bitcoins fast or slowly"
 "#;
 
     pub const NO_ARG: &str =

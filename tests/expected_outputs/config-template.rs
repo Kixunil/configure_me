@@ -2,6 +2,7 @@ pub enum ArgParseError {
     MissingArgument(&'static str),
     UnknownArgument(String),
     BadUtf8(&'static str),
+    HelpRequested(String),
 
 <<"arg_parse_error.rs">>
 }
@@ -112,6 +113,8 @@ mod raw {
             while let Some(arg) = iter.next() {
                 if arg == *"--" {
                     return Ok(None.into_iter().chain(iter));
+                } else if (arg == *"--help") || (arg == *"-h") {
+                    return Err(ArgParseError::HelpRequested(self._program_path.as_ref().unwrap().to_string_lossy().into()).into());
 <<"merge_args.rs">>
                 } else if arg.to_str().unwrap_or("").starts_with("--") {
                     return Err(ArgParseError::UnknownArgument(arg.into_string().unwrap()).into());

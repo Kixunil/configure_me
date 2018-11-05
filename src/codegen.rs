@@ -1,5 +1,6 @@
 use std::io::{self, Write};
 use ::config::{Config, Optionality};
+use ::unicode_segmentation::UnicodeSegmentation;
 
 fn gen_raw_params<W: Write>(config: &Config, mut output: W) -> io::Result<()> {
     for param in &config.params {
@@ -35,6 +36,89 @@ fn gen_arg_parse_error<W: Write>(config: &Config, mut output: W) -> io::Result<(
 }
 
 fn gen_display_arg_parse_error<W: Write>(config: &Config, mut output: W) -> io::Result<()> {
+    let sum_arg_len = config
+        .params
+        .iter()
+        .filter(|param| param.argument)
+        .map(|param| param.name.len() * 2 + 6)
+        .sum::<usize>()
+        + config
+        .switches
+        .iter()
+        .map(|switch| switch.name.len() + if switch.is_inverted() { 8 } else { 5 })
+        .sum::<usize>();
+
+    write!(output, "        ArgParseError::HelpRequested(program_name) => write!(f, \"Usage: {{}}")?;
+    // Standard width of the terminal - "Usage: ".len()
+    if sum_arg_len < (80 - 7) {
+        for param in config.params.iter().filter(|param| param.argument) {
+            write!(output, " [--")?;
+            underscore_to_hypen(&mut output, &param.name)?;
+            write!(output, " ")?;
+            for ch in param.name.chars().flat_map(char::to_uppercase) {
+                write!(output, "{}", ch)?;
+            }
+            write!(output, "]")?;
+        }
+        for switch in config.switches.iter() {
+            write!(output, " [--")?;
+            if switch.is_inverted() {
+                write!(output, "no-")?;
+            }
+            underscore_to_hypen(&mut output, &switch.name)?;
+            write!(output, "]")?;
+        }
+    } else {
+        write!(output, " [ARGUMENTS...]")?;
+    }
+    let max_param_len = config.params.iter().filter(|param| param.argument).filter(|param| sum_arg_len > (80 - 7) || param.doc.is_some()).map(|param| param.name.len()).max().unwrap_or(0);
+    let max_switch_len = config.switches.iter().filter(|switch| sum_arg_len > (80 - 7) || switch.doc.is_some()).map(|switch| switch.name.len() + if switch.is_inverted() { 3 } else { 0 }).max().unwrap_or(0);
+    let max_arg_len = ::std::cmp::max(max_param_len, max_switch_len);
+    let doc_start = 8 + 2 + max_arg_len + 4;
+    if max_arg_len > 0 {
+        write!(output, "\\nArguments:")?;
+        let params = config.params.iter().filter(|param| param.argument).map(|param| (&param.name, &param.doc, false));
+        let switches = config.switches.iter().map(|switch| (&switch.name, &switch.doc, switch.is_inverted()));
+        for (name, doc, is_inverted_switch) in params.chain(switches) {
+            if let Some(doc) = doc {
+                if doc.len() > 0 || sum_arg_len > (80 - 7) {
+                    write!(output, "\\n        --")?;
+                    let name_len = if is_inverted_switch {
+                        write!(output, "no-")?;
+                        name.len() + 3
+                    } else {
+                        name.len()
+                    };
+
+                    underscore_to_hypen(&mut output, name)?;
+                    for _ in 0..(max_arg_len + 4 - name_len) {
+                        write!(output, " ")?;
+                    }
+                    let mut pos = doc_start;
+                    for word in doc.split_word_bounds() {
+                        let word_len = word.graphemes(true).count();
+                        if word_len + pos > 80 {
+                            write!(output, "\\n          ")?;
+                            for _ in 0..(max_arg_len + 4) {
+                                write!(output, " ")?;
+                            }
+                            pos = doc_start;
+                        }
+
+                        if !(word.trim().len() == 0 && pos ==  doc_start) {
+                            write!(output, "{}", word)?;
+                            pos += word_len;
+                        }
+                    }
+                }
+            } else if sum_arg_len > (80 - 7) {
+                    write!(output, "        --")?;
+                    underscore_to_hypen(&mut output, name)?;
+                    write!(output, "\\n")?;
+            }
+        }
+    }
+    writeln!(output, "\", program_name),");
     for param in &config.params {
         if !param.argument {
             continue;
@@ -194,6 +278,7 @@ pub fn generate_code<W: Write>(config: &Config, mut output: W) -> io::Result<()>
     writeln!(output, "    MissingArgument(&'static str),")?;
     writeln!(output, "    UnknownArgument(String),")?;
     writeln!(output, "    BadUtf8(&'static str),")?;
+    writeln!(output, "    HelpRequested(String),")?;
     writeln!(output)?;
     gen_arg_parse_error(config, &mut output)?;
     writeln!(output, "}}")?;
@@ -304,6 +389,8 @@ pub fn generate_code<W: Write>(config: &Config, mut output: W) -> io::Result<()>
     writeln!(output, "            while let Some(arg) = iter.next() {{")?;
     writeln!(output, "                if arg == *\"--\" {{")?;
     writeln!(output, "                    return Ok(None.into_iter().chain(iter));")?;
+    writeln!(output, "                }} else if (arg == *\"--help\") || (arg == *\"-h\") {{")?;
+    writeln!(output, "                    return Err(ArgParseError::HelpRequested(self._program_path.as_ref().unwrap().to_string_lossy().into()).into());")?;
     gen_merge_args(config, &mut output)?;
     writeln!(output, "                }} else if arg.to_str().unwrap_or(\"\").starts_with(\"--\") {{")?;
     writeln!(output, "                    return Err(ArgParseError::UnknownArgument(arg.into_string().unwrap()).into());")?;

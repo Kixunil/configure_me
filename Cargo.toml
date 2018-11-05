@@ -16,6 +16,7 @@ build = "build.rs"
 serde = "1"
 serde_derive = "1"
 toml = "=0.4.5"
+unicode-segmentation = "1.2"
 
 [dev-dependencies]
 pretty_assertions = "0.5.1"

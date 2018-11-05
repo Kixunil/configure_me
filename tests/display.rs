@@ -40,3 +40,12 @@ fn unknown_arg() {
         Err(err) => assert_eq!(err.to_string(), "An unknown argument '--bar' was specified."),
     }
 }
+
+#[test]
+fn print_help() {
+    let result = config::Config::custom_args_and_optional_files(&["display", "--help"], iter::empty::<PathBuf>());
+    match result {
+        Ok(_) => panic!("This shouldn't succeed"),
+        Err(err) => assert_eq!(err.to_string(), "Usage: display [--foo FOO]"),
+    }
+}
