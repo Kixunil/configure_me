@@ -67,7 +67,7 @@
 //! toml = "0.4"
 //! 
 //! [build-dependencies]
-//! configure_me = "0.2.1"
+//! configure_me = "0.2.2"
 //! ```
 //! 
 //! Create a module `src/config.rs` for configuration:
@@ -88,10 +88,11 @@
 //! 
 //! mod config;
 //! 
-//! fn main() -> Result<(), config::Error> {
+//! fn main() {
+//!     use config::prelude::*;
 //!     // This will read configuration from "/etc/my_awesome_server/server.conf" file and
 //!     // the command-line arguments.
-//!     let (server_config, _remaining_args) = config::Config::including_optional_config_files(&["/etc/my_awesome_server/server.conf]")?;
+//!     let (server_config, _remaining_args) = Config::including_optional_config_files(&["/etc/my_awesome_server/server.conf]").unwrap_or_exit();
 //! 
 //!     // Your code here
 //!     // E.g.:

@@ -69,7 +69,7 @@ serde_derive = "1"
 toml = "0.4"
 
 [build-dependencies]
-configure_me = "0.2.1"
+configure_me = "0.2.2"
 ```
 
 Create a module `src/config.rs` for configuration:
@@ -91,7 +91,8 @@ extern crate toml;
 mod config;
 
 fn main() -> Result<(), config::Error> {
-    let (server_config, _remaining_args) = config::Config::including_optional_config_files(&["/etc/my_awesome_server/server.conf"]).unwrap();
+    use config::prelude:*;
+    let (server_config, _remaining_args) = Config::including_optional_config_files(&["/etc/my_awesome_server/server.conf"]).unwrap_or_exit();
 
     // Your code here
     // E.g.:
