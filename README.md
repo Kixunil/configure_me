@@ -47,12 +47,7 @@ Then, you create a build script like this:
 extern crate configure_me;
 
 fn main() {
-    let mut out: std::path::PathBuf = std::env::var_os("OUT_DIR").unwrap().into();
-    out.push("config.rs");
-    let config_spec = std::fs::File::open("config.toml").unwrap();
-    let config_code = std::fs::File::create(&out).unwrap();
-    configure_me::generate_source(config_spec, config_code).unwrap();
-    println!("rerun-if-changed=config.toml");
+    configure_me::build_script("config.toml").unwrap();
 }
 ```
 
@@ -69,7 +64,7 @@ serde_derive = "1"
 toml = "0.4"
 
 [build-dependencies]
-configure_me = "0.2.2"
+configure_me = "0.2.3"
 ```
 
 Create a module `src/config.rs` for configuration:
@@ -90,15 +85,13 @@ extern crate toml;
 
 mod config;
 
-fn main() -> Result<(), config::Error> {
+fn main() {
     use config::prelude:*;
     let (server_config, _remaining_args) = Config::including_optional_config_files(&["/etc/my_awesome_server/server.conf"]).unwrap_or_exit();
 
     // Your code here
     // E.g.:
     let listener = std::net::TcpListener::bind((server_config.bind_addr, server_config.port)).expect("Failed to bind socket");
-
-    Ok(())
 }
 ```
 
