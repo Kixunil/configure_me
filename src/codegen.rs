@@ -1,5 +1,5 @@
 use std::io::{self, Write};
-use ::config::{Config, Optionality, SwitchKind};
+use ::config::{Config, Optionality};
 
 fn gen_raw_params<W: Write>(config: &Config, mut output: W) -> io::Result<()> {
     for param in &config.params {
@@ -86,10 +86,7 @@ fn gen_construct_config_params<W: Write>(config: &Config, mut output: W) -> io::
 
 fn gen_copy_switches<W: Write>(config: &Config, mut output: W) -> io::Result<()> {
     for switch in &config.switches {
-        let default_value = match switch.kind {
-            SwitchKind::Inverted => "true",
-            _ => "false",
-        };
+        let default_value = if switch.is_inverted() { "true" } else { "false" };
         writeln!(output, "                {}: self.{}.unwrap_or({}),", switch.name, switch.name, default_value)?;
     }
     Ok(())
@@ -181,15 +178,12 @@ fn gen_merge_args<W: Write>(config: &Config, mut output: W) -> io::Result<()> {
 
 fn gen_arg_parse_switches<W: Write>(config: &Config, mut output: W) -> io::Result<()> {
     for switch in &config.switches {
-        match switch.kind {
-            SwitchKind::Inverted => {
-                writeln!(output, "                }} else if arg == *\"--no-{}\" {{", switch.name)?;
-                writeln!(output, "                    self.{} = Some(false);", switch.name)?;
-            },
-            _ => {
-                writeln!(output, "                }} else if arg == *\"--{}\" {{", switch.name)?;
-                writeln!(output, "                    self.{} = Some(true);", switch.name)?;
-            }
+        if switch.is_inverted() {
+            writeln!(output, "                }} else if arg == *\"--no-{}\" {{", switch.name)?;
+            writeln!(output, "                    self.{} = Some(false);", switch.name)?;
+        } else {
+            writeln!(output, "                }} else if arg == *\"--{}\" {{", switch.name)?;
+            writeln!(output, "                    self.{} = Some(true);", switch.name)?;
         }
     }
     Ok(())

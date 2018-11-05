@@ -192,6 +192,7 @@ pub enum Optionality {
     DefaultValue(String),
 }
 
+#[derive(Copy, Clone, Eq, PartialEq)]
 pub enum SwitchKind {
     Normal,
     WithAbbr(char),
@@ -212,4 +213,10 @@ pub struct Switch {
     pub name: String,
     pub kind: SwitchKind,
     pub doc: Option<String>,
+}
+
+impl Switch {
+    pub fn is_inverted(&self) -> bool {
+        self.kind == SwitchKind::Inverted
+    }
 }
