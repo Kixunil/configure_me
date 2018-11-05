@@ -1,22 +1,2 @@
-[package]
-name = "configure_me"
-version = "0.2.3"
-authors = ["Martin Habovštiak <martin.habovstiak@gmail.com>"]
-description = "A library for processing application configuration easily."
-homepage = "https://github.com/Kixunil/configure_me"
-repository = "https://github.com/Kixunil/configure_me"
-readme = "README.md"
-keywords = ["configuration", "arguments", "environment", "codegen"]
-categories = ["command-line-interface", "config", "encoding"]
-license = "MITNFA"
-maintenance = { status = "experimental" }
-build = "build.rs"
-
-[dependencies]
-serde = "1"
-serde_derive = "1"
-toml = "=0.4.5"
-unicode-segmentation = "1.2"
-
-[dev-dependencies]
-pretty_assertions = "0.5.1"
+[workspace]
+members = ["configure_me", "configure_me_codegen"]

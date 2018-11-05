@@ -6,6 +6,7 @@ use std::iter;
 use std::path::PathBuf;
 
 const EXPECTED_HELP: &str = r##"Usage: miner [--foo FOO] [--bar BAR] [--baz BAZ] [--verbose] [--no-fast]
+
 Arguments:
         --foo        A foo
         --bar        A very, very, very, very, very, very, very, very, very, 

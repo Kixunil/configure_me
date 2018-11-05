@@ -5,7 +5,6 @@ pub mod prelude {
 pub enum ArgParseError {
     MissingArgument(&'static str),
     UnknownArgument(String),
-    BadUtf8(&'static str),
     HelpRequested(String),
 
 <<"arg_parse_error.rs">>
@@ -16,7 +15,6 @@ impl ::std::fmt::Display for ArgParseError {
         match self {
             ArgParseError::MissingArgument(arg) => write!(f, "A value to argument '{}' is missing.", arg),
             ArgParseError::UnknownArgument(arg) => write!(f, "An unknown argument '{}' was specified.", arg),
-            ArgParseError::BadUtf8(arg) => write!(f, "The argument '{}' doesn't have valid UTF-8 encoding.", arg),
 <<"display_arg_parse_error.rs">>
         }
     }
@@ -48,7 +46,7 @@ impl ::std::fmt::Debug for ValidationError {
 
 pub enum Error {
     Reading { file: ::std::path::PathBuf, error: ::std::io::Error },
-    ConfigParsing { file: ::std::path::PathBuf, error: ::toml::de::Error },
+    ConfigParsing { file: ::std::path::PathBuf, error: ::configure_me::toml::de::Error },
     Arguments(ArgParseError),
     Validation(ValidationError),
 }
@@ -99,7 +97,7 @@ mod raw {
             let mut config_file = ::std::fs::File::open(&config_file_name).map_err(|error| super::Error::Reading { file: config_file_name.as_ref().into(), error })?;
             let mut config_content = Vec::new();
             config_file.read_to_end(&mut config_content).map_err(|error| super::Error::Reading { file: config_file_name.as_ref().into(), error })?;
-            ::toml::from_slice(&config_content).map_err(|error| super::Error::ConfigParsing { file: config_file_name.as_ref().into(), error })
+            ::configure_me::toml::from_slice(&config_content).map_err(|error| super::Error::ConfigParsing { file: config_file_name.as_ref().into(), error })
         }
 
         pub fn validate(self) -> Result<super::Config, ValidationError> {

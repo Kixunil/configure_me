@@ -1,30 +1,21 @@
                 } else if arg == *"--foo" {
                     let foo = iter.next().ok_or(ArgParseError::MissingArgument("--foo"))?;
 
-                    let foo = foo
-                        .to_str()
-                        .ok_or(ArgParseError::BadUtf8("--foo"))?
-                        .parse()
+                    let foo = ::configure_me::parse_arg::ParseArg::parse_owned_arg(foo)
                         .map_err(ArgParseError::FieldFoo)?;
 
                     self.foo = Some(foo);
                 } else if arg == *"--bar" {
                     let bar = iter.next().ok_or(ArgParseError::MissingArgument("--bar"))?;
 
-                    let bar = bar
-                        .to_str()
-                        .ok_or(ArgParseError::BadUtf8("--bar"))?
-                        .parse()
+                    let bar = ::configure_me::parse_arg::ParseArg::parse_owned_arg(bar)
                         .map_err(ArgParseError::FieldBar)?;
 
                     self.bar = Some(bar);
                 } else if arg == *"--baz" {
                     let baz = iter.next().ok_or(ArgParseError::MissingArgument("--baz"))?;
 
-                    let baz = baz
-                        .to_str()
-                        .ok_or(ArgParseError::BadUtf8("--baz"))?
-                        .parse()
+                    let baz = ::configure_me::parse_arg::ParseArg::parse_owned_arg(baz)
                         .map_err(ArgParseError::FieldBaz)?;
 
                     self.baz = Some(baz);

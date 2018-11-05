@@ -1,99 +1,5 @@
-//! This library aims to help with reading configuration of application from files,
-//! environment variables and command line arguments, merging it together and
-//! validating. It auto-generates most of the code for you based on configuration (heh)
-//! file. It creates a struct for you, which contains all the parsed and validated
-//! fields, so you can access the information quickly easily and idiomatically.
-//!
-//! **Important note:** since this is generating code, it's intended to be used *from
-//! build script*.
-//!
-
-//! Example
-//! -------
-//! 
-//! Let's say, your application needs these parametrs to run:
-//! 
-//! * Port - this is mandatory
-//! * IP address to bind to - defaults to 0.0.0.0
-//! * Path to TLS certificate - optional, the server will be unsecure if not given
-//! 
-//! First you create Toml configuration file specifying all the parameters:
-//! 
-//! ```toml
-//! [[param]]
-//! name = "port"
-//! type = "u16"
-//! optional = false
-//! 
-//! [[param]]
-//! name = "bind_addr"
-//! # Yes, this works and  you can use your own T: Deserialize + FromStr as well!
-//! type = "::std::net::Ipv4Addr" 
-//! default = "::std::net::Ipv4Addr::new(0, 0, 0, 0)" # Rust expression that creates the value
-//! 
-//! [[param]]
-//! name = "tls_cert"
-//! type = "String"
-//! # optional = true is the default, no need to add it here
-//! # If the type is optional, it will be represented as Option<T>
-//! # e.g. Option<String> in this case.
-//! ```
-//! 
-//! Then, you create a build script like this:
-//! 
-//! ```rust,ignore
-//! extern crate configure_me;
-//! 
-//! fn main() {
-//!     configure_me::build_script("config.toml").unwrap();
-//! }
-//! ```
-//! 
-//! Add dependencies to `Cargo.toml`:
-//! 
-//! ```toml
-//! [packge]
-//! # ...
-//! build = "build.rs"
-//! 
-//! [dependencies]
-//! serde = "1"
-//! serde_derive = "1"
-//! toml = "0.4"
-//! 
-//! [build-dependencies]
-//! configure_me = "0.2.3"
-//! ```
-//! 
-//! Create a module `src/config.rs` for configuration:
-//! 
-//! ```rust,ignore
-//! #![allow(unused)]
-//!
-//! include!(concat!(env!("OUT_DIR"), "/config.rs"));
-//! ```
-//! 
-//! And finally add appropriate incantiations into `src/main.rs`:
-//! 
-//! ```rust,ignore
-//! extern crate serde;
-//! #[macro_use]
-//! extern crate serde_derive;
-//! extern crate toml;
-//! 
-//! mod config;
-//! 
-//! fn main() {
-//!     use config::prelude::*;
-//!     // This will read configuration from "/etc/my_awesome_server/server.conf" file and
-//!     // the command-line arguments.
-//!     let (server_config, _remaining_args) = Config::including_optional_config_files(&["/etc/my_awesome_server/server.conf]").unwrap_or_exit();
-//! 
-//!     // Your code here
-//!     // E.g.:
-//!     let listener = std::net::TcpListener::bind((server_config.bind_addr, server_config.port)).expect("Failed to bind socket");
-//! }
-//! ```
+//! This is the codegen part of `configure_me` crate. Please refer to the documentation of
+//! `configure_me`.
 
 extern crate serde;
 #[macro_use]
@@ -176,7 +82,7 @@ pub fn generate_source<S: Read, O: Write>(mut source: S, output: O) -> Result<()
 /// cargo of the source file.
 pub fn build_script<P: AsRef<std::path::Path>>(source: P) -> Result<(), Error> {
      let mut out: std::path::PathBuf = std::env::var_os("OUT_DIR").ok_or(ErrorData::MissingOutDir)?.into();
-     out.push("config.rs");
+     out.push("configure_me_config.rs");
      let config_spec = std::fs::File::open(&source).map_err(|error| ErrorData::Open { file: source.as_ref().into(), error })?;
      let config_code = std::fs::File::create(&out).map_err(|error| ErrorData::Open { file: out, error })?;
      generate_source(config_spec, config_code)?;
