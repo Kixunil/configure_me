@@ -157,3 +157,27 @@ impl Config {
             .map_err(Into::into)
     }
 }
+
+pub trait ResultExt {
+    type Item;
+
+    fn unwrap_or_exit(self) -> Self::Item;
+}
+
+impl<T> ResultExt for Result<T, Error> {
+    type Item = T;
+
+    fn unwrap_or_exit(self) -> Self::Item {
+        match self {
+            Ok(item) => item,
+            Err(err @ Error::Arguments(ArgParseError::HelpRequested(_))) => {
+                println!("{}", err);
+                ::std::process::exit(0)
+            },
+            Err(err) => {
+                eprintln!("Error: {}", err);
+                ::std::process::exit(1)
+            }
+        }
+    }
+}
