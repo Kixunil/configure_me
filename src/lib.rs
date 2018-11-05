@@ -121,6 +121,8 @@ enum ErrorData {
     Toml(toml::de::Error),
     Config(config::ValidationError),
     Io(io::Error),
+    Open { file: std::path::PathBuf, error: io::Error },
+    MissingOutDir,
 }
 
 /// Error that occured during code generation
@@ -130,6 +132,14 @@ enum ErrorData {
 #[derive(Debug)]
 pub struct Error {
     data: ErrorData,
+}
+
+impl From<ErrorData> for Error {
+    fn from(data: ErrorData) -> Self {
+        Error {
+            data,
+        }
+    }
 }
 
 impl From<config::ValidationError> for Error {
@@ -164,6 +174,21 @@ pub fn generate_source<S: Read, O: Write>(mut source: S, output: O) -> Result<()
     let cfg = cfg.validate()?;
     
     codegen::generate_code(&cfg, output).map_err(Into::into)
+}
+
+/// Generates the source code for you from provided `toml` configuration file.
+///
+/// This function should be used from build script as it relies on cargo environment. It handles
+/// generating the name of the file (it's called `config.rs` inside `OUT_DIR`) as well as notifying
+/// cargo of the source file.
+pub fn build_script<P: AsRef<std::path::Path>>(source: P) -> Result<(), Error> {
+     let mut out: std::path::PathBuf = std::env::var_os("OUT_DIR").ok_or(ErrorData::MissingOutDir)?.into();
+     out.push("config.rs");
+     let config_spec = std::fs::File::open(&source).map_err(|error| ErrorData::Open { file: source.as_ref().into(), error })?;
+     let config_code = std::fs::File::create(&out).map_err(|error| ErrorData::Open { file: out, error })?;
+     generate_source(config_spec, config_code)?;
+     println!("rerun-if-changed={}", source.as_ref().display());
+     Ok(())
 }
 
 #[cfg(test)]
