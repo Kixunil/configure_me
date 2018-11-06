@@ -1,28 +1,53 @@
-use std::io::{self, Write};
+use std::fmt::{self, Write};
 use ::config::{Config, Optionality};
 use ::unicode_segmentation::UnicodeSegmentation;
 
-fn gen_raw_params<W: Write>(config: &Config, mut output: W) -> io::Result<()> {
+pub(crate) fn param_long(param: &::config::Param) -> String {
+    let mut res = String::with_capacity(param.name.len() + 2);
+    res.push_str("--");
+                                            // Writing to String never fails
+    underscore_to_hypen(&mut res, &param.name).unwrap();
+
+    res
+}
+
+pub(crate) fn switch_long(switch: &::config::Switch) -> String {
+    let mut res = if switch.is_inverted() {
+        let mut res = String::with_capacity(switch.name.len() + 5);
+        res.push_str("--no-");
+        res
+    } else {
+        let mut res = String::with_capacity(switch.name.len() + 2);
+        res.push_str("--");
+        res
+    };
+                                            // Writing to String never fails
+    underscore_to_hypen(&mut res, &switch.name).unwrap();
+
+    res
+}
+
+fn gen_raw_params<W: Write>(config: &Config, mut output: W) -> fmt::Result {
     for param in &config.params {
         writeln!(output, "        {}: Option<{}>,", param.name, param.ty)?;
     }
     Ok(())
 }
 
-fn gen_raw_switches<W: Write>(config: &Config, mut output: W) -> io::Result<()> {
+fn gen_raw_switches<W: Write>(config: &Config, mut output: W) -> fmt::Result {
     for switch in &config.switches {
         writeln!(output, "        {}: Option<bool>,", switch.name)?;
     }
     Ok(())
 }
 
-fn gen_raw_config<W: Write>(config: &Config, mut output: W) -> io::Result<()> {
+fn gen_raw_config<W: Write>(config: &Config, mut output: W) -> fmt::Result {
     gen_raw_params(config, &mut output)?;
     gen_raw_switches(config, &mut output)?;
     Ok(())
 }
 
-fn gen_arg_parse_error<W: Write>(config: &Config, mut output: W) -> io::Result<()> {
+fn gen_arg_parse_error<W: Write>(config: &Config, mut output: W) -> fmt::Result {
     for param in &config.params {
         if !param.argument {
             continue;
@@ -35,7 +60,7 @@ fn gen_arg_parse_error<W: Write>(config: &Config, mut output: W) -> io::Result<(
     Ok(())
 }
 
-fn gen_display_arg_parse_error<W: Write>(config: &Config, mut output: W) -> io::Result<()> {
+fn gen_display_arg_parse_error<W: Write>(config: &Config, mut output: W) -> fmt::Result {
     let sum_arg_len = config
         .params
         .iter()
@@ -133,7 +158,7 @@ fn gen_display_arg_parse_error<W: Write>(config: &Config, mut output: W) -> io::
     Ok(())
 }
 
-fn gen_params<W: Write>(config: &Config, mut output: W) -> io::Result<()> {
+fn gen_params<W: Write>(config: &Config, mut output: W) -> fmt::Result {
     for param in &config.params {
         match param.optionality {
             Optionality::Optional => writeln!(output, "    pub {}: Option<{}>,", param.name, param.ty)?,
@@ -143,14 +168,14 @@ fn gen_params<W: Write>(config: &Config, mut output: W) -> io::Result<()> {
     Ok(())
 }
 
-fn gen_switches<W: Write>(config: &Config, mut output: W) -> io::Result<()> {
+fn gen_switches<W: Write>(config: &Config, mut output: W) -> fmt::Result {
     for switch in &config.switches {
         writeln!(output, "    pub {}: bool,", switch.name)?;
     }
     Ok(())
 }
 
-fn gen_param_validation<W: Write>(config: &Config, mut output: W) -> io::Result<()> {
+fn gen_param_validation<W: Write>(config: &Config, mut output: W) -> fmt::Result {
     for param in &config.params {
         match param.optionality {
             Optionality::Optional => writeln!(output, "            let {} = self.{};", param.name, param.name)?,
@@ -161,14 +186,14 @@ fn gen_param_validation<W: Write>(config: &Config, mut output: W) -> io::Result<
     Ok(())
 }
 
-fn gen_construct_config_params<W: Write>(config: &Config, mut output: W) -> io::Result<()> {
+fn gen_construct_config_params<W: Write>(config: &Config, mut output: W) -> fmt::Result {
     for param in &config.params {
         writeln!(output, "                {},", param.name)?;
     }
     Ok(())
 }
 
-fn gen_copy_switches<W: Write>(config: &Config, mut output: W) -> io::Result<()> {
+fn gen_copy_switches<W: Write>(config: &Config, mut output: W) -> fmt::Result {
     for switch in &config.switches {
         let default_value = if switch.is_inverted() { "true" } else { "false" };
         writeln!(output, "                {}: self.{}.unwrap_or({}),", switch.name, switch.name, default_value)?;
@@ -176,7 +201,7 @@ fn gen_copy_switches<W: Write>(config: &Config, mut output: W) -> io::Result<()>
     Ok(())
 }
 
-fn gen_validation_fn<W: Write>(config: &Config, mut output: W) -> io::Result<()> {
+fn gen_validation_fn<W: Write>(config: &Config, mut output: W) -> fmt::Result {
     gen_param_validation(config, &mut output)?;
     writeln!(output)?;
     writeln!(output, "            Ok(super::Config {{")?;
@@ -186,7 +211,7 @@ fn gen_validation_fn<W: Write>(config: &Config, mut output: W) -> io::Result<()>
     Ok(())
 }
 
-fn gen_merge_in<W: Write>(config: &Config, mut output: W) -> io::Result<()> {
+fn gen_merge_in<W: Write>(config: &Config, mut output: W) -> fmt::Result {
     for param in &config.params {
         writeln!(output, "            if self.{}.is_none() {{", param.name)?;
         writeln!(output, "                self.{} = other.{};", param.name, param.name)?;
@@ -200,7 +225,7 @@ fn gen_merge_in<W: Write>(config: &Config, mut output: W) -> io::Result<()> {
     Ok(())
 }
 
-fn pascal_case<W: Write>(mut output: W, ident: &str) -> io::Result<()> {
+fn pascal_case<W: Write>(mut output: W, ident: &str) -> fmt::Result {
     let mut next_big = true;
     for c in ident.chars() {
         match (c, next_big) {
@@ -215,7 +240,7 @@ fn pascal_case<W: Write>(mut output: W, ident: &str) -> io::Result<()> {
     Ok(())
 }
 
-fn underscore_to_hypen<W: Write>(mut output: W, ident: &str) -> io::Result<()> {
+fn underscore_to_hypen<W: Write>(mut output: W, ident: &str) -> fmt::Result {
     for c in ident.chars() {
         if c == '_' {
                 write!(output, "-")?;
@@ -226,7 +251,7 @@ fn underscore_to_hypen<W: Write>(mut output: W, ident: &str) -> io::Result<()> {
     Ok(())
 }
 
-fn gen_arg_parse_params<W: Write>(config: &Config, mut output: W) -> io::Result<()> {
+fn gen_arg_parse_params<W: Write>(config: &Config, mut output: W) -> fmt::Result {
     for param in &config.params {
         if !param.argument {
             continue;
@@ -249,13 +274,13 @@ fn gen_arg_parse_params<W: Write>(config: &Config, mut output: W) -> io::Result<
     Ok(())
 }
 
-fn gen_merge_args<W: Write>(config: &Config, mut output: W) -> io::Result<()> {
+fn gen_merge_args<W: Write>(config: &Config, mut output: W) -> fmt::Result {
     gen_arg_parse_params(config, &mut output)?;
     gen_arg_parse_switches(config, &mut output)?;
     Ok(())
 }
 
-fn gen_arg_parse_switches<W: Write>(config: &Config, mut output: W) -> io::Result<()> {
+fn gen_arg_parse_switches<W: Write>(config: &Config, mut output: W) -> fmt::Result {
     for switch in &config.switches {
         if switch.is_inverted() {
             writeln!(output, "                }} else if arg == *\"--no-{}\" {{", switch.name)?;
@@ -268,7 +293,7 @@ fn gen_arg_parse_switches<W: Write>(config: &Config, mut output: W) -> io::Resul
     Ok(())
 }
 
-pub fn generate_code<W: Write>(config: &Config, mut output: W) -> io::Result<()> {
+pub fn generate_code<W: Write>(config: &Config, mut output: W) -> fmt::Result {
     writeln!(output, "pub mod prelude {{")?;
     writeln!(output, "    pub use super::{{Config, ResultExt}};")?;
     writeln!(output, "}}")?;

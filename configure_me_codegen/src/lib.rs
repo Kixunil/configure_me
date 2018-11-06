@@ -9,18 +9,25 @@ extern crate toml;
 #[macro_use]
 extern crate pretty_assertions;
 extern crate unicode_segmentation;
+extern crate fmt2io;
+extern crate build_helper;
+#[cfg(feature = "man")]
+extern crate man;
 
 pub(crate) mod config;
 pub(crate) mod codegen;
+#[cfg(feature = "man")]
+pub (crate) mod gen_man;
 
 use std::io::{self, Read, Write};
+use std::path::PathBuf;
 
 #[derive(Debug)]
 enum ErrorData {
     Toml(toml::de::Error),
     Config(config::ValidationError),
     Io(io::Error),
-    Open { file: std::path::PathBuf, error: io::Error },
+    Open { file: PathBuf, error: io::Error },
     MissingOutDir,
 }
 
@@ -65,14 +72,56 @@ impl From<toml::de::Error> for Error {
     }
 }
 
-/// Generates the source code for you from provided `toml` configuration.
-pub fn generate_source<S: Read, O: Write>(mut source: S, output: O) -> Result<(), Error> {
+fn load<S: Read>(mut source: S) -> Result<config::Config, Error> {
     let mut data = Vec::new();
     source.read_to_end(&mut data)?;
     let cfg = toml::from_slice::<config::raw::Config>(&data)?;
     let cfg = cfg.validate()?;
+
+    Ok(cfg)
+}
+
+fn load_from_file<P: AsRef<std::path::Path>>(source: P) -> Result<::config::Config, Error> {
+     let config_spec = std::fs::File::open(&source).map_err(|error| ErrorData::Open { file: source.as_ref().into(), error })?;
+
+     load(config_spec)
+}
+
+fn path_in_out_dir<P: AsRef<std::path::Path>>(file_name: P) -> Result<PathBuf, Error> {
+    let mut out: PathBuf = std::env::var_os("OUT_DIR").ok_or(ErrorData::MissingOutDir)?.into();
+    out.push(file_name);
+
+    Ok(out)
+}
+
+fn default_out_file() -> Result<PathBuf, Error> {
+    path_in_out_dir("configure_me_config.rs")
+}
+
+// Wrapper for error conversions
+fn create_file<P: AsRef<std::path::Path> + Into<PathBuf>>(file: P) -> Result<std::fs::File, Error> {
+    std::fs::File::create(&file)
+        .map_err(|error| ErrorData::Open { file: file.into(), error })
+        .map_err(Into::into)
+}
+
+fn generate_to_file<P: AsRef<std::path::Path> + Into<PathBuf>>(config_spec: &::config::Config, file: P) -> Result<(), Error> {
+     let config_code = create_file(file)?;
+     ::fmt2io::write(config_code, |config_code| codegen::generate_code(config_spec, config_code)).map_err(Into::into)
+}
+
+fn load_and_generate_default<P: AsRef<std::path::Path>>(source: P) -> Result<::config::Config, Error> {
+    let config_spec = load_from_file(&source)?;
+    generate_to_file(&config_spec, default_out_file()?)?;
+    println!("rerun-if-changed={}", source.as_ref().display());
+    Ok(config_spec)
+}
+
+/// Generates the source code for you from provided `toml` configuration.
+pub fn generate_source<S: Read, O: Write>(source: S, output: O) -> Result<(), Error> {
+    let cfg = load(source)?;
     
-    codegen::generate_code(&cfg, output).map_err(Into::into)
+     ::fmt2io::write(output, |output| codegen::generate_code(&cfg, output)).map_err(Into::into)
 }
 
 /// Generates the source code for you from provided `toml` configuration file.
@@ -81,13 +130,17 @@ pub fn generate_source<S: Read, O: Write>(mut source: S, output: O) -> Result<()
 /// generating the name of the file (it's called `config.rs` inside `OUT_DIR`) as well as notifying
 /// cargo of the source file.
 pub fn build_script<P: AsRef<std::path::Path>>(source: P) -> Result<(), Error> {
-     let mut out: std::path::PathBuf = std::env::var_os("OUT_DIR").ok_or(ErrorData::MissingOutDir)?.into();
-     out.push("configure_me_config.rs");
-     let config_spec = std::fs::File::open(&source).map_err(|error| ErrorData::Open { file: source.as_ref().into(), error })?;
-     let config_code = std::fs::File::create(&out).map_err(|error| ErrorData::Open { file: out, error })?;
-     generate_source(config_spec, config_code)?;
-     println!("rerun-if-changed={}", source.as_ref().display());
-     Ok(())
+    load_and_generate_default(source).map(::std::mem::drop)
+}
+
+#[cfg(feature = "man")]
+pub fn build_script_with_man<P: AsRef<std::path::Path>>(source: P) -> Result<(), Error> {
+    let config_spec = load_and_generate_default(source)?;
+    let man_page = gen_man::generate_man_page(&config_spec);
+
+    let mut file = create_file(path_in_out_dir("app.man")?)?;
+    file.write_all(man_page.as_bytes())?;
+    Ok(())
 }
 
 #[cfg(test)]
