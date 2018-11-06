@@ -26,16 +26,21 @@
 //! name = "port"
 //! type = "u16"
 //! optional = false
+//! # This text will be used in the documentation (help etc)
+//! # It's not mandatory, but your progam will be ugly without it.
+//! doc = "Port to listen on."
 //! 
 //! [[param]]
 //! name = "bind_addr"
 //! # Yes, this works and  you can use your own T: Deserialize + FromStr as well!
 //! type = "::std::net::Ipv4Addr" 
 //! default = "::std::net::Ipv4Addr::new(0, 0, 0, 0)" # Rust expression that creates the value
+//! doc = "IP address to bind to."
 //! 
 //! [[param]]
 //! name = "tls_cert"
 //! type = "::std::path::PathBuf"
+//! doc = "Path to the TLS certificate. The connections will be unsecure if it isn't provided."
 //! # optional = true is the default, no need to add it here
 //! # If the type is optional, it will be represented as Option<T>
 //! # e.g. Option<::std::path::PathBuf> in this case.
