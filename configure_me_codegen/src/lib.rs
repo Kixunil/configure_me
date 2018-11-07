@@ -135,10 +135,15 @@ pub fn build_script<P: AsRef<Path>>(source: P) -> Result<(), Error> {
 
 #[cfg(feature = "man")]
 pub fn build_script_with_man<P: AsRef<Path>>(source: P) -> Result<(), Error> {
+    build_script_with_man_written_to(source, path_in_out_dir("app.man")?)
+}
+
+#[cfg(feature = "man")]
+pub fn build_script_with_man_written_to<P: AsRef<Path>, M: AsRef<Path> + Into<PathBuf>>(source: P, output: M) -> Result<(), Error> {
     let config_spec = load_and_generate_default(source)?;
     let man_page = gen_man::generate_man_page(&config_spec);
 
-    let mut file = create_file(path_in_out_dir("app.man")?)?;
+    let mut file = create_file(output)?;
     file.write_all(man_page.as_bytes())?;
     Ok(())
 }
