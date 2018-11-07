@@ -56,6 +56,8 @@ fn main() {
 }
 ```
 
+*Tip: use `configure_me::build_script_with_man` to generate man page as well.*
+
 Add dependencies to `Cargo.toml`:
 
 ```toml
@@ -69,7 +71,7 @@ configure_me = "0.3"
 serde = "1"
 
 [build-dependencies]
-configure_me_codegen = "0.3"
+configure_me_codegen = "0.3.1"
 ```
 
 And finally add appropriate incantiations into `src/main.rs`:

@@ -133,11 +133,19 @@ pub fn build_script<P: AsRef<Path>>(source: P) -> Result<(), Error> {
     load_and_generate_default(source).map(::std::mem::drop)
 }
 
+/// Generates the source code and manual page at default location.
+///
+/// This is same as `build_script()`, but additionaly it generates a man page.
+/// The resulting man page will be stored in `$OUT_DIR/app.man`.
 #[cfg(feature = "man")]
 pub fn build_script_with_man<P: AsRef<Path>>(source: P) -> Result<(), Error> {
     build_script_with_man_written_to(source, path_in_out_dir("app.man")?)
 }
 
+/// Generates the source code and manual page at specified location.
+///
+/// This is same as `build_script_with_man()`, but it allows you to choose where to put the man
+/// page.
 #[cfg(feature = "man")]
 pub fn build_script_with_man_written_to<P: AsRef<Path>, M: AsRef<Path> + Into<PathBuf>>(source: P, output: M) -> Result<(), Error> {
     let config_spec = load_and_generate_default(source)?;
