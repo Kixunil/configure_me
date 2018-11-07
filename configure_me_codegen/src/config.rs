@@ -160,6 +160,8 @@ pub struct Config {
 #[derive(Deserialize, Default)]
 #[serde(deny_unknown_fields)]
 pub struct General {
+    pub name: Option<String>,
+    pub summary: Option<String>,
     pub doc: Option<String>,
     pub env_prefix: Option<String>,
 }

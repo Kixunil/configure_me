@@ -1,9 +1,20 @@
 use ::config::Config;
 use ::man::prelude::*;
 
-fn generate_meta() -> Manual {
-    let name = ::build_helper::cargo::pkg::name();
-    let man = Manual::new(&name);
+fn generate_meta(config: &Config) -> Manual {
+    let man = if let Some(name) = &config.general.name {
+        Manual::new(name)
+    } else {
+        Manual::new(&::build_helper::cargo::pkg::name())
+    };
+
+    let man = if let Some(summary) = &config.general.summary {
+        man.about(&**summary)
+    } else if let Some(summary) = ::build_helper::cargo::pkg::description() {
+        man.about(summary)
+    } else {
+        man
+    };
 
     let authors = ::build_helper::cargo::pkg::authors();
     authors.iter().fold(man, |man, author| {
@@ -64,9 +75,9 @@ fn generate_switches(man: Manual, config: &Config) -> Manual {
 }
 
 pub fn generate_man_page(config: &Config) -> String {
-    let man = generate_meta();
+    let man = generate_meta(config);
     let man = if let Some(doc) = &config.general.doc {
-        man.about(doc.to_owned())
+        man.description(doc.to_owned())
     } else {
         man
     };
