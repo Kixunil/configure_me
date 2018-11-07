@@ -59,7 +59,7 @@ fn main() {
 Add dependencies to `Cargo.toml`:
 
 ```toml
-[packge]
+[package]
 # ...
 build = "build.rs"
 
