@@ -1,6 +1,6 @@
 [package]
 name = "configure_me_codegen"
-version = "0.3.1"
+version = "0.3.2"
 authors = ["Martin Habovštiak <martin.habovstiak@gmail.com>"]
 description = "A library for processing application configuration easily."
 homepage = "https://github.com/Kixunil/configure_me"
@@ -26,4 +26,4 @@ man = { version = "0.1.1", optional = true }
 
 [dev-dependencies]
 pretty_assertions = "0.5.1"
-configure_me = "0.3.0"
+configure_me = "0.3.1"

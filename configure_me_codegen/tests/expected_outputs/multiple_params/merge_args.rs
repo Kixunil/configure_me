@@ -1,22 +1,13 @@
-                } else if arg == *"--foo" {
-                    let foo = iter.next().ok_or(ArgParseError::MissingArgument("--foo"))?;
-
-                    let foo = ::configure_me::parse_arg::ParseArg::parse_owned_arg(foo)
-                        .map_err(ArgParseError::FieldFoo)?;
+                } else if let Some(value) = ::configure_me::parse_arg::match_arg("--foo", &arg, &mut iter) {
+                    let foo = value.map_err(|err| err.map_or(ArgParseError::MissingArgument("--foo"), ArgParseError::FieldFoo))?;
 
                     self.foo = Some(foo);
-                } else if arg == *"--bar" {
-                    let bar = iter.next().ok_or(ArgParseError::MissingArgument("--bar"))?;
-
-                    let bar = ::configure_me::parse_arg::ParseArg::parse_owned_arg(bar)
-                        .map_err(ArgParseError::FieldBar)?;
+                } else if let Some(value) = ::configure_me::parse_arg::match_arg("--bar", &arg, &mut iter) {
+                    let bar = value.map_err(|err| err.map_or(ArgParseError::MissingArgument("--bar"), ArgParseError::FieldBar))?;
 
                     self.bar = Some(bar);
-                } else if arg == *"--baz" {
-                    let baz = iter.next().ok_or(ArgParseError::MissingArgument("--baz"))?;
-
-                    let baz = ::configure_me::parse_arg::ParseArg::parse_owned_arg(baz)
-                        .map_err(ArgParseError::FieldBaz)?;
+                } else if let Some(value) = ::configure_me::parse_arg::match_arg("--baz", &arg, &mut iter) {
+                    let baz = value.map_err(|err| err.map_or(ArgParseError::MissingArgument("--baz"), ArgParseError::FieldBaz))?;
 
                     self.baz = Some(baz);
                 } else if arg == *"--verbose" {

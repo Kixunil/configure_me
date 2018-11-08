@@ -257,17 +257,14 @@ fn gen_arg_parse_params<W: Write>(config: &Config, mut output: W) -> fmt::Result
             continue;
         }
 
-        write!(output, "                }} else if arg == *\"--")?;
+        write!(output, "                }} else if let Some(value) = ::configure_me::parse_arg::match_arg(\"--")?;
         underscore_to_hypen(&mut output, &param.name)?;
-        writeln!(output, "\" {{")?;
-        write!(output, "                    let {} = iter.next().ok_or(ArgParseError::MissingArgument(\"--", &param.name)?;
+        writeln!(output, "\", &arg, &mut iter) {{")?;
+        write!(output, "                    let {} = value.map_err(|err| err.map_or(ArgParseError::MissingArgument(\"--", &param.name)?;
         underscore_to_hypen(&mut output, &param.name)?;
-        writeln!(output, "\"))?;")?;
-        writeln!(output)?;
-        writeln!(output, "                    let {} = ::configure_me::parse_arg::ParseArg::parse_owned_arg({})", param.name, param.name)?;
-        write!(  output, "                        .map_err(ArgParseError::Field")?;
+        write!(output, "\"), ArgParseError::Field")?;
         pascal_case(&mut output, &param.name)?;
-        writeln!(output, ")?;")?;
+        writeln!(output, "))?;")?;
         writeln!(output)?;
         writeln!(output, "                    self.{} = Some({});", param.name, param.name)?;
     }

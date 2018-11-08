@@ -66,12 +66,12 @@ Add dependencies to `Cargo.toml`:
 build = "build.rs"
 
 [dependencies]
-configure_me = "0.3"
+configure_me = "0.3.1"
 # Yes, this must be here too.
 serde = "1"
 
 [build-dependencies]
-configure_me_codegen = "0.3.1"
+configure_me_codegen = "0.3.2"
 ```
 
 And finally add appropriate incantiations into `src/main.rs`:

@@ -1,7 +1,4 @@
-                } else if arg == *"--foo" {
-                    let foo = iter.next().ok_or(ArgParseError::MissingArgument("--foo"))?;
-
-                    let foo = ::configure_me::parse_arg::ParseArg::parse_owned_arg(foo)
-                        .map_err(ArgParseError::FieldFoo)?;
+                } else if let Some(value) = ::configure_me::parse_arg::match_arg("--foo", &arg, &mut iter) {
+                    let foo = value.map_err(|err| err.map_or(ArgParseError::MissingArgument("--foo"), ArgParseError::FieldFoo))?;
 
                     self.foo = Some(foo);
