@@ -502,9 +502,9 @@ mod tests {
 
     macro_rules! check {
         ($fn:ident, $config:expr, $expected:expr) => {
-            let mut out = Vec::new();
+            let mut out = String::new();
             super::$fn($config, &mut out).unwrap();
-            assert_eq!(::std::str::from_utf8(&out).unwrap(), $expected);
+            assert_eq!(out, $expected);
         }
     }
 
