@@ -1,4 +1,16 @@
         ArgParseError::HelpRequested(program_name) => write!(f, "Usage: {} [--foo FOO] [--bar BAR] [--baz BAZ] [--verbose] [--no-fast]\n\nArguments:\n        --foo        A foo\n        --bar        A very, very, very, very, very, very, very, very, very, \n                     very, very, very, very, very long documentation...\n        --baz        A much, much, much, much, much, much, much, much, much, \n                     much, much, much, much, much, much, much, much, much, much,\n                     much, much, much, much, much, much, much, much, much, much,\n                     much, much, much, much, much, much, much, much, much, much,\n                     much, much, much longer documentation...\n        --no-fast    Determines whether to mine bitcoins fast or slowly", program_name),
-        ArgParseError::FieldFoo(err) => write!(f, "Failed to parse argument '--foo': {}.", err),
-        ArgParseError::FieldBar(err) => write!(f, "Failed to parse argument '--bar': {}.", err),
-        ArgParseError::FieldBaz(err) => write!(f, "Failed to parse argument '--baz': {}.", err),
+        ArgParseError::FieldFoo(err) => {
+            write!(f, "Failed to parse argument '--foo': {}.\n\nHint: the value must be ", err)?;
+            <u32 as ::configure_me::parse_arg::ParseArg>::describe_type(&mut *f)?;
+            write!(f, ".")
+        },
+        ArgParseError::FieldBar(err) => {
+            write!(f, "Failed to parse argument '--bar': {}.\n\nHint: the value must be ", err)?;
+            <String as ::configure_me::parse_arg::ParseArg>::describe_type(&mut *f)?;
+            write!(f, ".")
+        },
+        ArgParseError::FieldBaz(err) => {
+            write!(f, "Failed to parse argument '--baz': {}.\n\nHint: the value must be ", err)?;
+            <String as ::configure_me::parse_arg::ParseArg>::describe_type(&mut *f)?;
+            write!(f, ".")
+        },

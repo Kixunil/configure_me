@@ -28,7 +28,7 @@ fn parse_fail() {
     let result = config::Config::custom_args_and_optional_files(&["display", "--foo", "fortytwo"], iter::empty::<PathBuf>());
     match result {
         Ok(_) => panic!("This shouldn't succeed"),
-        Err(err) => assert_eq!(err.to_string(), "Failed to parse argument '--foo': invalid digit found in string."),
+        Err(err) => assert_eq!(err.to_string(), "Failed to parse argument '--foo': invalid digit found in string.\n\nHint: the value must be a non-negative integer up to 4294967295."),
     }
 }
 

@@ -151,9 +151,13 @@ fn gen_display_arg_parse_error<W: Write>(config: &Config, mut output: W) -> fmt:
 
         write!(output, "        ArgParseError::Field")?;
         pascal_case(&mut output, &param.name)?;
-        write!(output, "(err) => write!(f, \"Failed to parse argument '--")?;
+        writeln!(output, "(err) => {{")?;
+        write!(output, "            write!(f, \"Failed to parse argument '--")?;
         underscore_to_hypen(&mut output, &param.name)?;
-        writeln!(output, "': {{}}.\", err),")?;
+        writeln!(output, "': {{}}.\\n\\nHint: the value must be \", err)?;")?;
+        writeln!(output, "            <{} as ::configure_me::parse_arg::ParseArg>::describe_type(&mut *f)?;", param.ty);
+        writeln!(output, "            write!(f, \".\")");
+        writeln!(output, "        }},")?;
     }
     Ok(())
 }
