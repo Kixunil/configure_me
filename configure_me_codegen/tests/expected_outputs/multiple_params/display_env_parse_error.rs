@@ -13,3 +13,9 @@
             <String as ::configure_me::parse_arg::ParseArg>::describe_type(&mut *f)?;
             write!(f, ".")
         },
+        EnvParseError::FieldVerbose(ref err) => {
+            write!(f, "Invalid value '{:?}' for 'TEST_APP_VERBOSE'.\n\nHint: the allowed values are 0, false, 1, true.", err)
+        },
+        EnvParseError::FieldFast(ref err) => {
+            write!(f, "Invalid value '{:?}' for 'TEST_APP_FAST'.\n\nHint: the allowed values are 0, false, 1, true.", err)
+        },

@@ -70,6 +70,15 @@ fn gen_env_parse_error<W: Write>(config: &Config, mut output: W) -> fmt::Result 
         pascal_case(&mut output, &param.name)?;
         writeln!(output, "(<{} as ::configure_me::parse_arg::ParseArg>::Error),", param.ty)?;
     }
+    for switch in &config.switches {
+        if !switch.env_var {
+            continue;
+        }
+
+        write!(output, "    Field")?;
+        pascal_case(&mut output, &switch.name)?;
+        writeln!(output, "(::std::ffi::OsString),")?;
+    }
     Ok(())
 }
 
@@ -195,6 +204,20 @@ fn gen_display_env_parse_error<W: Write>(config: &Config, mut output: W) -> fmt:
         writeln!(output, "': {{}}.\\n\\nHint: the value must be \", err)?;")?;
         writeln!(output, "            <{} as ::configure_me::parse_arg::ParseArg>::describe_type(&mut *f)?;", param.ty);
         writeln!(output, "            write!(f, \".\")");
+        writeln!(output, "        }},")?;
+    }
+    for switch in &config.switches {
+        if !switch.env_var {
+            continue;
+        }
+
+        write!(output, "        EnvParseError::Field")?;
+        pascal_case(&mut output, &switch.name)?;
+        writeln!(output, "(ref err) => {{")?;
+        write!(output, "            write!(f, \"Invalid value '{{:?}}' for '")?;
+        config.general.env_prefix.as_ref().map(|prefix| { upper_case(&mut output, &prefix)?; write!(output, "_") }).unwrap_or(Ok(()))?;
+        upper_case(&mut output, &switch.name)?;
+        writeln!(output, "'.\\n\\nHint: the allowed values are 0, false, 1, true.\", err)")?;
         writeln!(output, "        }},")?;
     }
     Ok(())
@@ -345,6 +368,25 @@ fn gen_merge_env<W: Write>(config: &Config, mut output: W) -> fmt::Result {
         pascal_case(&mut output, &param.name)?;
         writeln!(output, ")?;")?;
         writeln!(output, "            self.{} = Some(val);", param.name)?;
+        writeln!(output, "        }}")?;
+    }
+    for switch in &config.switches {
+        if !switch.env_var {
+            continue;
+        }
+        write!(output, "        if let Some(val) = ::std::env::var_os(\"")?;
+        config.general.env_prefix.as_ref().map(|prefix| { upper_case(&mut output, &prefix)?; write!(output, "_") }).unwrap_or(Ok(()))?;
+        upper_case(&mut output, &switch.name)?;
+        writeln!(output, "\") {{")?;
+        writeln!(output, "            if val == *\"1\" || val == *\"true\" {{")?;
+        writeln!(output, "                self.{} = Some(true);", switch.name)?;
+        writeln!(output, "            }} else if val == *\"0\" || val == *\"false\" {{")?;
+        writeln!(output, "                self.{} = Some(false);", switch.name)?;
+        writeln!(output, "            }} else {{")?;
+        write!(output, "                return Err(super::EnvParseError::Field")?;
+        pascal_case(&mut output, &switch.name)?;
+        writeln!(output, "(val).into());")?;
+        writeln!(output, "            }}")?;
         writeln!(output, "        }}")?;
     }
     Ok(())

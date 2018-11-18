@@ -42,7 +42,7 @@ pub mod raw {
 
             let switches = self.switches
                 .into_iter()
-                .map(Switch::validate)
+                .map(|switch| switch.validate(default_env_var))
                 .collect::<Result<Vec<_>, _>>()?;
 
             Ok(super::Config {
@@ -120,10 +120,11 @@ pub mod raw {
         abbr: Option<String>,
         default: Option<bool>,
         doc: Option<String>,
+        env_var: Option<bool>,
     }
 
     impl Switch {
-        fn validate(self) -> Result<super::Switch, ValidationError> {
+        fn validate(self, default_env_var: bool) -> Result<super::Switch, ValidationError> {
             use super::SwitchKind;
 
             let kind = match (self.abbr, self.default) {
@@ -140,6 +141,7 @@ pub mod raw {
                 name: self.name,
                 kind,
                 doc: self.doc,
+                env_var: self.env_var.unwrap_or(default_env_var),
             })
         }
     }
@@ -215,6 +217,7 @@ pub struct Switch {
     pub name: String,
     pub kind: SwitchKind,
     pub doc: Option<String>,
+    pub env_var: bool,
 }
 
 impl Switch {
