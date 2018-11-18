@@ -74,6 +74,50 @@ fn generate_switches(man: Manual, config: &Config) -> Manual {
         .fold(man, |man, flag| man.flag(flag))
 }
 
+fn generate_param_env_vars(man: Manual, config: &Config) -> Manual {
+    let prefix = config.general.env_prefix.as_ref().map_or_else(String::new, |prefix| [&prefix, "_"].join(""));
+    config
+        .params
+        .iter()
+        .filter(|param| param.env_var).map(|param| {
+            let env = Env::new(&[&prefix as &str, &param.name.to_uppercase()].join(""));
+            let env = if let Some(doc) = &param.doc {
+                env.help(&doc)
+            } else {
+                env
+            };
+            let env = if let ::config::Optionality::DefaultValue(default) = &param.optionality {
+                env.default_value(&default)
+            } else {
+                env
+            };
+            env
+        })
+        .fold(man, |man, env| man.env(env))
+}
+
+fn generate_switch_env_vars(man: Manual, config: &Config) -> Manual {
+    let prefix = config.general.env_prefix.as_ref().map_or_else(String::new, |prefix| [&prefix, "_"].join(""));
+    config
+        .switches
+        .iter()
+        .filter(|switch| switch.env_var).map(|switch| {
+            let env = Env::new(&[&prefix as &str, &switch.name.to_uppercase()].join(""));
+            let env = if let Some(doc) = &switch.doc {
+                env.help(&doc)
+            } else {
+                env
+            };
+            let env = if switch.is_inverted() {
+                env.default_value("true")
+            } else {
+                env.default_value("false")
+            };
+            env
+        })
+        .fold(man, |man, env| man.env(env))
+}
+
 pub fn generate_man_page(config: &Config) -> String {
     let man = generate_meta(config);
     let man = if let Some(doc) = &config.general.doc {
@@ -83,6 +127,8 @@ pub fn generate_man_page(config: &Config) -> String {
     };
     let man = generate_params(man, config);
     let man = generate_switches(man, config);
+    let man = generate_param_env_vars(man, config);
+    let man = generate_switch_env_vars(man, config);
 
     man.render()
 }
