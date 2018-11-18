@@ -163,6 +163,9 @@ pub(crate) mod tests {
 
     pub const SINGLE_OPTIONAL_PARAM: &str =
 r#"
+[general]
+env_prefix = "TEST_APP"
+
 [[param]]
 name = "foo"
 type = "u32"
@@ -170,6 +173,9 @@ type = "u32"
 
     pub const SINGLE_MANDATORY_PARAM: &str =
 r#"
+[general]
+env_prefix = "TEST_APP"
+
 [[param]]
 name = "foo"
 type = "u32"
@@ -178,6 +184,9 @@ optional = false
 
     pub const SINGLE_DEFAULT_PARAM: &str =
 r#"
+[general]
+env_prefix = "TEST_APP"
+
 [[param]]
 name = "foo"
 type = "u32"
@@ -186,12 +195,18 @@ default = "42"
 
     pub const SINGLE_SWITCH: &str =
 r#"
+[general]
+env_prefix = "TEST_APP"
+
 [[switch]]
 name = "foo"
 "#;
 
     pub const MULTIPLE_PARAMS: &str =
 r#"
+[general]
+env_prefix = "TEST_APP"
+
 [[param]]
 name = "foo"
 type = "u32"
@@ -222,6 +237,9 @@ doc = "Determines whether to mine bitcoins fast or slowly"
 
     pub const NO_ARG: &str =
 r#"
+[general]
+env_prefix = "TEST_APP"
+
 [[param]]
 name = "foo"
 type = "u32"

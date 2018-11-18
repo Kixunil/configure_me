@@ -34,7 +34,7 @@ pub mod raw {
         pub fn validate(self) -> Result<super::Config, ValidationError> {
             let default_optional = self.defaults.optional;
             let default_argument = self.defaults.args;
-            let default_env_var = self.defaults.env_vars;
+            let default_env_var = self.defaults.env_vars.unwrap_or(self.general.env_prefix.is_some());
             let params = self.params
                 .into_iter()
                 .map(|param| param.validate(default_optional, default_argument, default_env_var))
@@ -172,8 +172,8 @@ pub struct General {
 pub struct Defaults {
     #[serde(default = "make_true")]
     pub args: bool,
-    #[serde(default = "make_true")]
-    pub env_vars: bool,
+    #[serde(default)]
+    pub env_vars: Option<bool>,
     #[serde(default = "make_true")]
     pub optional: bool,
 }
@@ -182,7 +182,7 @@ impl Default for Defaults {
     fn default() -> Self {
         Defaults {
             args: true,
-            env_vars: true,
+            env_vars: None,
             optional: true,
         }
     }

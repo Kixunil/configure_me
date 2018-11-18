@@ -60,6 +60,26 @@ fn gen_arg_parse_error<W: Write>(config: &Config, mut output: W) -> fmt::Result 
     Ok(())
 }
 
+fn gen_env_parse_error<W: Write>(config: &Config, mut output: W) -> fmt::Result {
+    for param in &config.params {
+        if !param.env_var {
+            continue;
+        }
+
+        write!(output, "    Field")?;
+        pascal_case(&mut output, &param.name)?;
+        writeln!(output, "(<{} as ::configure_me::parse_arg::ParseArg>::Error),", param.ty)?;
+    }
+    Ok(())
+}
+
+fn upper_case<W: Write>(mut output: W, string: &str) -> fmt::Result {
+    for ch in string.chars().flat_map(char::to_uppercase) {
+        write!(output, "{}", ch)?;
+    }
+    Ok(())
+}
+
 fn gen_display_arg_parse_error<W: Write>(config: &Config, mut output: W) -> fmt::Result {
     let sum_arg_len = config
         .params
@@ -80,9 +100,7 @@ fn gen_display_arg_parse_error<W: Write>(config: &Config, mut output: W) -> fmt:
             write!(output, " [--")?;
             underscore_to_hypen(&mut output, &param.name)?;
             write!(output, " ")?;
-            for ch in param.name.chars().flat_map(char::to_uppercase) {
-                write!(output, "{}", ch)?;
-            }
+            upper_case(&mut output, &param.name)?;
             write!(output, "]")?;
         }
         for switch in config.switches.iter() {
@@ -154,6 +172,26 @@ fn gen_display_arg_parse_error<W: Write>(config: &Config, mut output: W) -> fmt:
         writeln!(output, "(err) => {{")?;
         write!(output, "            write!(f, \"Failed to parse argument '--")?;
         underscore_to_hypen(&mut output, &param.name)?;
+        writeln!(output, "': {{}}.\\n\\nHint: the value must be \", err)?;")?;
+        writeln!(output, "            <{} as ::configure_me::parse_arg::ParseArg>::describe_type(&mut *f)?;", param.ty);
+        writeln!(output, "            write!(f, \".\")");
+        writeln!(output, "        }},")?;
+    }
+    Ok(())
+}
+
+fn gen_display_env_parse_error<W: Write>(config: &Config, mut output: W) -> fmt::Result {
+    for param in &config.params {
+        if !param.env_var {
+            continue;
+        }
+
+        write!(output, "        EnvParseError::Field")?;
+        pascal_case(&mut output, &param.name)?;
+        writeln!(output, "(ref err) => {{")?;
+        write!(output, "            write!(f, \"Failed to parse environment variable '")?;
+        config.general.env_prefix.as_ref().map(|prefix| { upper_case(&mut output, &prefix)?; write!(output, "_") }).unwrap_or(Ok(()))?;
+        upper_case(&mut output, &param.name)?;
         writeln!(output, "': {{}}.\\n\\nHint: the value must be \", err)?;")?;
         writeln!(output, "            <{} as ::configure_me::parse_arg::ParseArg>::describe_type(&mut *f)?;", param.ty);
         writeln!(output, "            write!(f, \".\")");
@@ -294,6 +332,24 @@ fn gen_arg_parse_switches<W: Write>(config: &Config, mut output: W) -> fmt::Resu
     Ok(())
 }
 
+fn gen_merge_env<W: Write>(config: &Config, mut output: W) -> fmt::Result {
+    for param in &config.params {
+        if !param.env_var {
+            continue;
+        }
+        write!(output, "        if let Some(val) = ::std::env::var_os(\"")?;
+        config.general.env_prefix.as_ref().map(|prefix| { upper_case(&mut output, &prefix)?; write!(output, "_") }).unwrap_or(Ok(()))?;
+        upper_case(&mut output, &param.name)?;
+        writeln!(output, "\") {{")?;
+        write!(output, "            let val = ::configure_me::parse_arg::ParseArg::parse_owned_arg(val).map_err(super::EnvParseError::Field")?;
+        pascal_case(&mut output, &param.name)?;
+        writeln!(output, ")?;")?;
+        writeln!(output, "            self.{} = Some(val);", param.name)?;
+        writeln!(output, "        }}")?;
+    }
+    Ok(())
+}
+
 pub fn generate_code<W: Write>(config: &Config, mut output: W) -> fmt::Result {
     writeln!(output, "pub mod prelude {{")?;
     writeln!(output, "    pub use super::{{Config, ResultExt}};")?;
@@ -323,6 +379,24 @@ pub fn generate_code<W: Write>(config: &Config, mut output: W) -> fmt::Result {
     writeln!(output, "    }}")?;
     writeln!(output, "}}")?;
     writeln!(output)?;
+    writeln!(output, "pub enum EnvParseError {{")?;
+    gen_env_parse_error(config, &mut output)?;
+    writeln!(output, "}}")?;
+    writeln!(output)?;
+    writeln!(output, "impl ::std::fmt::Display for EnvParseError {{")?;
+    writeln!(output, "    fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {{")?;
+    writeln!(output, "        match *self {{")?;
+    gen_display_env_parse_error(config, &mut output)?;
+    writeln!(output, "        }}")?;
+    writeln!(output, "    }}")?;
+    writeln!(output, "}}")?;
+    writeln!(output)?;
+    writeln!(output, "impl ::std::fmt::Debug for EnvParseError {{")?;
+    writeln!(output, "    fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {{")?;
+    writeln!(output, "        ::std::fmt::Display::fmt(self, f)")?;
+    writeln!(output, "    }}")?;
+    writeln!(output, "}}")?;
+    writeln!(output)?;
     writeln!(output, "pub enum ValidationError {{")?;
     writeln!(output, "    MissingField(&'static str),")?;
     writeln!(output, "}}")?;
@@ -345,12 +419,19 @@ pub fn generate_code<W: Write>(config: &Config, mut output: W) -> fmt::Result {
     writeln!(output, "    Reading {{ file: ::std::path::PathBuf, error: ::std::io::Error }},")?;
     writeln!(output, "    ConfigParsing {{ file: ::std::path::PathBuf, error: ::configure_me::toml::de::Error }},")?;
     writeln!(output, "    Arguments(ArgParseError),")?;
+    writeln!(output, "    Environment(EnvParseError),")?;
     writeln!(output, "    Validation(ValidationError),")?;
     writeln!(output, "}}")?;
     writeln!(output)?;
     writeln!(output, "impl From<ArgParseError> for Error {{")?;
     writeln!(output, "    fn from(err: ArgParseError) -> Self {{")?;
     writeln!(output, "        Error::Arguments(err)")?;
+    writeln!(output, "    }}")?;
+    writeln!(output, "}}")?;
+    writeln!(output)?;
+    writeln!(output, "impl From<EnvParseError> for Error {{")?;
+    writeln!(output, "    fn from(err: EnvParseError) -> Self {{")?;
+    writeln!(output, "        Error::Environment(err)")?;
     writeln!(output, "    }}")?;
     writeln!(output, "}}")?;
     writeln!(output)?;
@@ -366,6 +447,7 @@ pub fn generate_code<W: Write>(config: &Config, mut output: W) -> fmt::Result {
     writeln!(output, "            Error::Reading {{ file, error }} => write!(f, \"Failed to read configuration file {{}}: {{}}\", file.display(), error),")?;
     writeln!(output, "            Error::ConfigParsing {{ file, error }} => write!(f, \"Failed to parse configuration file {{}}: {{}}\", file.display(), error),")?;
     writeln!(output, "            Error::Arguments(err) => write!(f, \"{{}}\", err),")?;
+    writeln!(output, "            Error::Environment(err) => write!(f, \"{{}}\", err),")?;
     writeln!(output, "            Error::Validation(err) => write!(f, \"Invalid configuration: {{}}\", err),")?;
     writeln!(output, "        }}")?;
     writeln!(output, "    }}")?;
@@ -424,6 +506,11 @@ pub fn generate_code<W: Write>(config: &Config, mut output: W) -> fmt::Result {
     writeln!(output)?;
     writeln!(output, "            Ok(None.into_iter().chain(iter))")?;
     writeln!(output, "        }}")?;
+    writeln!(output)?;
+    writeln!(output, "        pub fn merge_env(&mut self) -> Result<(), super::Error> {{")?;
+    gen_merge_env(config, &mut output)?;
+    writeln!(output, "            Ok(())")?;
+    writeln!(output, "        }}")?;
     writeln!(output, "    }}")?;
     writeln!(output, "}}")?;
     writeln!(output)?;
@@ -454,6 +541,7 @@ pub fn generate_code<W: Write>(config: &Config, mut output: W) -> fmt::Result {
     writeln!(output, "            }}")?;
     writeln!(output, "        }}")?;
     writeln!(output)?;
+    writeln!(output, "        config.merge_env()?;")?;
     writeln!(output, "        config.merge_in(arg_cfg);")?;
     writeln!(output)?;
     writeln!(output, "        config")?;

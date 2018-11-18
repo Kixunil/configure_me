@@ -26,6 +26,24 @@ impl ::std::fmt::Debug for ArgParseError {
     }
 }
 
+pub enum EnvParseError {
+<<"env_parse_error.rs">>
+}
+
+impl ::std::fmt::Display for EnvParseError {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
+        match *self {
+<<"display_env_parse_error.rs">>
+        }
+    }
+}
+
+impl ::std::fmt::Debug for EnvParseError {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
+        ::std::fmt::Display::fmt(self, f)
+    }
+}
+
 pub enum ValidationError {
     MissingField(&'static str),
 }
@@ -48,12 +66,19 @@ pub enum Error {
     Reading { file: ::std::path::PathBuf, error: ::std::io::Error },
     ConfigParsing { file: ::std::path::PathBuf, error: ::configure_me::toml::de::Error },
     Arguments(ArgParseError),
+    Environment(EnvParseError),
     Validation(ValidationError),
 }
 
 impl From<ArgParseError> for Error {
     fn from(err: ArgParseError) -> Self {
         Error::Arguments(err)
+    }
+}
+
+impl From<EnvParseError> for Error {
+    fn from(err: EnvParseError) -> Self {
+        Error::Environment(err)
     }
 }
 
@@ -69,6 +94,7 @@ impl ::std::fmt::Display for Error {
             Error::Reading { file, error } => write!(f, "Failed to read configuration file {}: {}", file.display(), error),
             Error::ConfigParsing { file, error } => write!(f, "Failed to parse configuration file {}: {}", file.display(), error),
             Error::Arguments(err) => write!(f, "{}", err),
+            Error::Environment(err) => write!(f, "{}", err),
             Error::Validation(err) => write!(f, "Invalid configuration: {}", err),
         }
     }
@@ -127,6 +153,11 @@ mod raw {
 
             Ok(None.into_iter().chain(iter))
         }
+
+        pub fn merge_env(&mut self) -> Result<(), super::Error> {
+<<"merge_env.rs">>
+            Ok(())
+        }
     }
 }
 
@@ -156,6 +187,7 @@ impl Config {
             }
         }
 
+        config.merge_env()?;
         config.merge_in(arg_cfg);
 
         config
