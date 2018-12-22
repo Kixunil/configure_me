@@ -564,7 +564,7 @@ pub fn generate_code<W: Write>(config: &Config, mut output: W) -> fmt::Result {
     writeln!(output)?;
     writeln!(output, "impl Config {{")?;
     writeln!(output, "    pub fn including_optional_config_files<I>(config_files: I) -> Result<(Self, impl Iterator<Item=::std::ffi::OsString>), Error> where I: IntoIterator, I::Item: AsRef<::std::path::Path> {{")?;
-    writeln!(output, "        Config::custom_args_and_optional_files(::std::env::args_os(), config_files)")?;
+    writeln!(output, "        Self::custom_args_and_optional_files(::std::env::args_os(), config_files)")?;
     writeln!(output, "    }}")?;
     writeln!(output)?;
     writeln!(output, "    pub fn custom_args_and_optional_files<A, I>(args: A, config_files: I) -> Result<(Self, impl Iterator<Item=::std::ffi::OsString>), Error> where")?;
