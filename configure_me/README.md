@@ -46,13 +46,13 @@ doc = "Path to the TLS certificate. The connections will be unsecure if it isn't
 # optional = true is the default, no need to add it here
 ```
 
-Then, create a simple script like:
+Then, create a simple `build.rs` script like:
 
 ```rust
-extern crate configure_me;
+extern crate configure_me_codegen;
 
 fn main() {
-    configure_me::build_script("config_spec.toml").unwrap();
+    configure_me_codegen::build_script("config_spec.toml").unwrap();
 }
 ```
 
