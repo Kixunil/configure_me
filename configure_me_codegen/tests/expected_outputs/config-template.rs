@@ -188,9 +188,9 @@ impl Config {
         }
 
         config.merge_env()?;
-        config.merge_in(arg_cfg);
+        arg_cfg.merge_in(config);
 
-        config
+        arg_cfg
             .validate()
             .map(|cfg| (cfg, remaining_args))
             .map_err(Into::into)

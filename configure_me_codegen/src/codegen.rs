@@ -623,9 +623,9 @@ pub fn generate_code<W: Write>(config: &Config, mut output: W) -> fmt::Result {
     writeln!(output, "        }}")?;
     writeln!(output)?;
     writeln!(output, "        config.merge_env()?;")?;
-    writeln!(output, "        config.merge_in(arg_cfg);")?;
+    writeln!(output, "        arg_cfg.merge_in(config);")?;
     writeln!(output)?;
-    writeln!(output, "        config")?;
+    writeln!(output, "        arg_cfg")?;
     writeln!(output, "            .validate()")?;
     writeln!(output, "            .map(|cfg| (cfg, remaining_args))")?;
     writeln!(output, "            .map_err(Into::into)")?;
