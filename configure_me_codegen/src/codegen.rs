@@ -174,7 +174,7 @@ fn gen_display_arg_parse_error<W: Write>(config: &Config, mut output: W) -> fmt:
             }
         }
     }
-    writeln!(output, "\", program_name),");
+    writeln!(output, "\", program_name),")?;
     for param in &config.params {
         if !param.argument {
             continue;
@@ -186,8 +186,8 @@ fn gen_display_arg_parse_error<W: Write>(config: &Config, mut output: W) -> fmt:
         write!(output, "            write!(f, \"Failed to parse argument '--")?;
         underscore_to_hypen(&mut output, &param.name)?;
         writeln!(output, "': {{}}.\\n\\nHint: the value must be \", err)?;")?;
-        writeln!(output, "            <{} as ::configure_me::parse_arg::ParseArg>::describe_type(&mut *f)?;", param.ty);
-        writeln!(output, "            write!(f, \".\")");
+        writeln!(output, "            <{} as ::configure_me::parse_arg::ParseArg>::describe_type(&mut *f)?;", param.ty)?;
+        writeln!(output, "            write!(f, \".\")")?;
         writeln!(output, "        }},")?;
     }
     Ok(())
@@ -206,8 +206,8 @@ fn gen_display_env_parse_error<W: Write>(config: &Config, mut output: W) -> fmt:
         config.general.env_prefix.as_ref().map(|prefix| { upper_case(&mut output, &prefix)?; write!(output, "_") }).unwrap_or(Ok(()))?;
         upper_case(&mut output, &param.name)?;
         writeln!(output, "': {{}}.\\n\\nHint: the value must be \", err)?;")?;
-        writeln!(output, "            <{} as ::configure_me::parse_arg::ParseArg>::describe_type(&mut *f)?;", param.ty);
-        writeln!(output, "            write!(f, \".\")");
+        writeln!(output, "            <{} as ::configure_me::parse_arg::ParseArg>::describe_type(&mut *f)?;", param.ty)?;
+        writeln!(output, "            write!(f, \".\")")?;
         writeln!(output, "        }},")?;
     }
     for switch in &config.switches {
@@ -222,8 +222,8 @@ fn gen_display_env_parse_error<W: Write>(config: &Config, mut output: W) -> fmt:
             write!(output, "            write!(f, \"Invalid value '{{:?}}' for '")?;
             upper_case(&mut output, &switch.name)?;
             writeln!(output, "': {{}}.\\n\\nHint: the value must be \", err)?;")?;
-            writeln!(output, "            <u32 as ::configure_me::parse_arg::ParseArg>::describe_type(&mut *f)?;");
-            writeln!(output, "            write!(f, \".\")");
+            writeln!(output, "            <u32 as ::configure_me::parse_arg::ParseArg>::describe_type(&mut *f)?;")?;
+            writeln!(output, "            write!(f, \".\")")?;
         } else {
             write!(output, "            write!(f, \"Invalid value '{{:?}}' for '")?;
             config.general.env_prefix.as_ref().map(|prefix| { upper_case(&mut output, &prefix)?; write!(output, "_") }).unwrap_or(Ok(()))?;
