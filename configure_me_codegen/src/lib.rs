@@ -115,7 +115,7 @@ fn generate_to_file<P: AsRef<Path> + Into<PathBuf>>(config_spec: &::config::Conf
 fn load_and_generate_default<P: AsRef<Path>>(source: P) -> Result<::config::Config, Error> {
     let config_spec = load_from_file(&source)?;
     generate_to_file(&config_spec, default_out_file()?)?;
-    println!("rerun-if-changed={}", source.as_ref().display());
+    println!("cargo:rerun-if-changed={}", source.as_ref().display());
     Ok(config_spec)
 }
 
