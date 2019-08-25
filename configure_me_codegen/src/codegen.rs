@@ -36,7 +36,11 @@ fn gen_raw_params<W: Write>(config: &Config, mut output: W) -> fmt::Result {
 
 fn gen_raw_switches<W: Write>(config: &Config, mut output: W) -> fmt::Result {
     for switch in &config.switches {
-        writeln!(output, "        {}: Option<bool>,", switch.name)?;
+        if switch.is_count() {
+            writeln!(output, "        {}: Option<u32>,", switch.name)?;
+        } else {
+            writeln!(output, "        {}: Option<bool>,", switch.name)?;
+        }
     }
     Ok(())
 }
@@ -214,10 +218,18 @@ fn gen_display_env_parse_error<W: Write>(config: &Config, mut output: W) -> fmt:
         write!(output, "        EnvParseError::Field")?;
         pascal_case(&mut output, &switch.name)?;
         writeln!(output, "(ref err) => {{")?;
-        write!(output, "            write!(f, \"Invalid value '{{:?}}' for '")?;
-        config.general.env_prefix.as_ref().map(|prefix| { upper_case(&mut output, &prefix)?; write!(output, "_") }).unwrap_or(Ok(()))?;
-        upper_case(&mut output, &switch.name)?;
-        writeln!(output, "'.\\n\\nHint: the allowed values are 0, false, 1, true.\", err)")?;
+        if switch.is_count() {
+            write!(output, "            write!(f, \"Invalid value '{{:?}}' for '")?;
+            upper_case(&mut output, &switch.name)?;
+            writeln!(output, "': {{}}.\\n\\nHint: the value must be \", err)?;")?;
+            writeln!(output, "            <u32 as ::configure_me::parse_arg::ParseArg>::describe_type(&mut *f)?;");
+            writeln!(output, "            write!(f, \".\")");
+        } else {
+            write!(output, "            write!(f, \"Invalid value '{{:?}}' for '")?;
+            config.general.env_prefix.as_ref().map(|prefix| { upper_case(&mut output, &prefix)?; write!(output, "_") }).unwrap_or(Ok(()))?;
+            upper_case(&mut output, &switch.name)?;
+            writeln!(output, "'.\\n\\nHint: the allowed values are 0, false, 1, true.\", err)")?;
+        }
         writeln!(output, "        }},")?;
     }
     Ok(())
@@ -235,7 +247,11 @@ fn gen_params<W: Write>(config: &Config, mut output: W) -> fmt::Result {
 
 fn gen_switches<W: Write>(config: &Config, mut output: W) -> fmt::Result {
     for switch in &config.switches {
-        writeln!(output, "    pub {}: bool,", switch.name)?;
+        if switch.is_count() {
+            writeln!(output, "    pub {}: u32,", switch.name)?;
+        } else {
+            writeln!(output, "    pub {}: bool,", switch.name)?;
+        }
     }
     Ok(())
 }
@@ -264,7 +280,13 @@ fn gen_construct_config_params<W: Write>(config: &Config, mut output: W) -> fmt:
 
 fn gen_copy_switches<W: Write>(config: &Config, mut output: W) -> fmt::Result {
     for switch in &config.switches {
-        let default_value = if switch.is_inverted() { "true" } else { "false" };
+        let default_value = if switch.is_inverted() {
+            "true"
+        } else if switch.is_count() {
+            "0"
+        } else {
+            "false"
+        };
         writeln!(output, "                {}: self.{}.unwrap_or({}),", switch.name, switch.name, default_value)?;
     }
     Ok(())
@@ -353,7 +375,12 @@ fn gen_arg_parse_switches<W: Write>(config: &Config, mut output: W) -> fmt::Resu
             writeln!(output, "                    self.{} = Some(false);", switch.name)?;
         } else {
             writeln!(output, "                }} else if arg == *\"--{}\" {{", switch.name)?;
-            writeln!(output, "                    self.{} = Some(true);", switch.name)?;
+
+            if switch.is_count() {
+                writeln!(output, "                    *(self.{}.get_or_insert(0)) += 1;", switch.name)?;
+            } else {
+                writeln!(output, "                    self.{} = Some(true);", switch.name)?;
+            }
         }
     }
     Ok(())
@@ -382,15 +409,23 @@ fn gen_merge_env<W: Write>(config: &Config, mut output: W) -> fmt::Result {
         config.general.env_prefix.as_ref().map(|prefix| { upper_case(&mut output, &prefix)?; write!(output, "_") }).unwrap_or(Ok(()))?;
         upper_case(&mut output, &switch.name)?;
         writeln!(output, "\") {{")?;
-        writeln!(output, "            if val == *\"1\" || val == *\"true\" {{")?;
-        writeln!(output, "                self.{} = Some(true);", switch.name)?;
-        writeln!(output, "            }} else if val == *\"0\" || val == *\"false\" {{")?;
-        writeln!(output, "                self.{} = Some(false);", switch.name)?;
-        writeln!(output, "            }} else {{")?;
-        write!(output, "                return Err(super::EnvParseError::Field")?;
-        pascal_case(&mut output, &switch.name)?;
-        writeln!(output, "(val).into());")?;
-        writeln!(output, "            }}")?;
+        if switch.is_count() {
+            writeln!(output, "            let val= <u32 as ::parse_arg::ParseArg>::parse_arg(&val).map_err(|err| super::EnvParseError::Field")?;
+            write!(output, "                return Err(super::EnvParseError::Field")?;
+            pascal_case(&mut output, &switch.name)?;
+            writeln!(output, "(val).into());")?;
+            writeln!(output, "            self.{} = Some(val);", switch.name)?;
+        } else {
+            writeln!(output, "            if val == *\"1\" || val == *\"true\" {{")?;
+            writeln!(output, "                self.{} = Some(true);", switch.name)?;
+            writeln!(output, "            }} else if val == *\"0\" || val == *\"false\" {{")?;
+            writeln!(output, "                self.{} = Some(false);", switch.name)?;
+            writeln!(output, "            }} else {{")?;
+            write!(output, "                return Err(super::EnvParseError::Field")?;
+            pascal_case(&mut output, &switch.name)?;
+            writeln!(output, "(val).into());")?;
+            writeln!(output, "            }}")?;
+        }
         writeln!(output, "        }}")?;
     }
     Ok(())

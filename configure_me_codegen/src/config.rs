@@ -2,6 +2,7 @@
 pub enum ValidationErrorKind {
     MandatoryWithDefault,
     InvertedWithAbbr,
+    InvertedWithCount,
     InvalidAbbr,
 }
 
@@ -125,20 +126,29 @@ pub mod raw {
         default: Option<bool>,
         doc: Option<String>,
         env_var: Option<bool>,
+        count: Option<bool>,
     }
 
     impl Switch {
         fn validate(self, default_env_var: bool) -> Result<super::Switch, ValidationError> {
             use super::SwitchKind;
 
-            let kind = match (self.abbr, self.default) {
-                (Some(_), Some(true)) => return Err(ValidationError { name: self.name, kind: ValidationErrorKind::InvertedWithAbbr, }),
-                (Some(mut abbr), _) => match abbr.pop() {
-                    Some(chr) if abbr.len() == 0 && ((chr >= 'a' && chr <= 'z') || (chr >= 'A' && chr <= 'Z')) => SwitchKind::WithAbbr(chr),
-                    _ => return Err(ValidationError { name: self.name, kind: ValidationErrorKind::InvalidAbbr, }),
+            let kind = match (self.abbr, self.default, self.count) {
+                (Some(_), Some(true), _) => return Err(ValidationError { name: self.name, kind: ValidationErrorKind::InvertedWithAbbr, }),
+                (_, Some(true), Some(true)) => return Err(ValidationError { name: self.name, kind: ValidationErrorKind::InvertedWithCount, }),
+                (None, Some(true), None) | (None, Some(true), Some(false)) => SwitchKind::Inverted,
+                (abbr, _, count) => {
+                    let abbr = if let Some(mut abbr) = abbr {
+                        match abbr.pop() {
+                            Some(chr) if abbr.len() == 0 && ((chr >= 'a' && chr <= 'z') || (chr >= 'A' && chr <= 'Z')) => Some(chr),
+                            _ => return Err(ValidationError { name: self.name.clone(), kind: ValidationErrorKind::InvalidAbbr, }),
+                        }
+                    } else {
+                        None
+                    };
+
+                    SwitchKind::Normal { abbr, count: count.unwrap_or(false) }
                 },
-                (None, Some(true)) => SwitchKind::Inverted,
-                (None, _) => SwitchKind::Normal,
             };
 
             Ok(super::Switch {
@@ -202,8 +212,7 @@ pub enum Optionality {
 
 #[derive(Copy, Clone, Eq, PartialEq)]
 pub enum SwitchKind {
-    Normal,
-    WithAbbr(char),
+    Normal { abbr: Option<char>, count: bool },
     Inverted,
 }
 
@@ -229,4 +238,13 @@ impl Switch {
     pub fn is_inverted(&self) -> bool {
         self.kind == SwitchKind::Inverted
     }
+
+    pub fn is_count(&self) -> bool {
+        if let SwitchKind::Normal { count: true, .. } = self.kind {
+            true
+        } else {
+            false
+        }
+    }
+
 }
