@@ -5,9 +5,11 @@ extern crate serde;
 #[macro_use]
 extern crate serde_derive;
 extern crate toml;
+/*
 #[cfg(test)]
 #[macro_use]
 extern crate pretty_assertions;
+*/
 extern crate unicode_segmentation;
 extern crate fmt2io;
 extern crate build_helper;

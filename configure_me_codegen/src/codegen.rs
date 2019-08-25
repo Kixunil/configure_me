@@ -226,8 +226,8 @@ fn gen_display_env_parse_error<W: Write>(config: &Config, mut output: W) -> fmt:
 fn gen_params<W: Write>(config: &Config, mut output: W) -> fmt::Result {
     for param in &config.params {
         match param.optionality {
-            Optionality::Optional => writeln!(output, "    pub {}: Option<{}>,", param.name, param.ty)?,
-            _ => writeln!(output, "    pub {}: {},", param.name, param.ty)?,
+            Optionality::Optional => writeln!(output, "    pub {}: Option<{}>,", param.name, param.convert_into)?,
+            _ => writeln!(output, "    pub {}: {},", param.name, param.convert_into)?,
         }
     }
     Ok(())
@@ -253,7 +253,11 @@ fn gen_param_validation<W: Write>(config: &Config, mut output: W) -> fmt::Result
 
 fn gen_construct_config_params<W: Write>(config: &Config, mut output: W) -> fmt::Result {
     for param in &config.params {
-        writeln!(output, "                {},", param.name)?;
+        if let Optionality::Optional = param.optionality {
+            writeln!(output, "                {}: {}.map(Into::into),", param.name, param.name)?;
+        } else {
+            writeln!(output, "                {}: {}.into(),", param.name, param.name)?;
+        }
     }
     Ok(())
 }

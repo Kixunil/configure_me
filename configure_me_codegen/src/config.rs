@@ -67,6 +67,7 @@ pub mod raw {
         doc: Option<String>,
         argument: Option<bool>,
         env_var: Option<bool>,
+        convert_into: Option<String>,
     }
 
     impl Param {
@@ -97,17 +98,20 @@ pub mod raw {
                 None
             };
 
+            let ty = self.ty;
             let argument = self.argument.unwrap_or(default_argument);
             let env_var = self.env_var.unwrap_or(default_env_var);
+            let convert_into = self.convert_into.unwrap_or_else(|| ty.clone());
 
             Ok(super::Param {
                 name: self.name,
-                ty: self.ty,
+                ty,
                 optionality,
                 abbr,
                 doc: self.doc,
                 argument,
                 env_var,
+                convert_into,
             })
         }
     }
@@ -211,6 +215,7 @@ pub struct Param {
     pub doc: Option<String>,
     pub argument: bool,
     pub env_var: bool,
+    pub convert_into: String,
 }
 
 pub struct Switch {
