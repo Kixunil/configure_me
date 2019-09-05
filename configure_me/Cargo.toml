@@ -1,6 +1,6 @@
 [package]
 name = "configure_me"
-version = "0.3.1"
+version = "0.3.2"
 authors = ["Martin Habovstiak <martin.habovstiak@gmail.com>"]
 description = "A library for processing application configuration easily."
 homepage = "https://github.com/Kixunil/configure_me"
@@ -15,4 +15,4 @@ maintenance = { status = "actively-maintained" }
 serde = "1"
 serde_derive = "1"
 toml = "0.4.8"
-parse_arg = "0.1.1"
+parse_arg = "0.1.3"
