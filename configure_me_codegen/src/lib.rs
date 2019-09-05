@@ -253,6 +253,7 @@ r#"
 [[switch]]
 name = "a"
 abbr = "a"
+doc = "test"
 
 [[switch]]
 name = "b"

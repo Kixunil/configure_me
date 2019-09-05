@@ -113,6 +113,8 @@ fn upper_case<W: Write>(mut output: W, string: &str) -> fmt::Result {
 }
 
 fn gen_display_arg_parse_error<W: Write>(config: &Config, mut output: W) -> fmt::Result {
+    use ::config::SwitchKind;
+
     let sum_arg_len = config
         .params
         .iter()
@@ -129,40 +131,64 @@ fn gen_display_arg_parse_error<W: Write>(config: &Config, mut output: W) -> fmt:
     // Standard width of the terminal - "Usage: ".len()
     if sum_arg_len < (80 - 7) {
         for param in config.params.iter().filter(|param| param.argument) {
-            write!(output, " [--")?;
+            if let Some(abbr) = &param.abbr {
+                write!(output, " [-{} ", abbr)?;
+                upper_case(&mut output, &param.name)?;
+                write!(output, "|--")?;
+            } else {
+                write!(output, " [--")?;
+            }
             underscore_to_hypen(&mut output, &param.name)?;
             write!(output, " ")?;
             upper_case(&mut output, &param.name)?;
             write!(output, "]")?;
         }
         for switch in config.switches.iter() {
-            write!(output, " [--")?;
+            if let SwitchKind::Normal { abbr: Some(abbr), .. } = &switch.kind {
+                write!(output, " [-{}|--", abbr)?;
+            } else {
+                write!(output, " [--")?;
+            }
             if switch.is_inverted() {
                 write!(output, "no-")?;
             }
             underscore_to_hypen(&mut output, &switch.name)?;
+            if switch.is_count() {
+                write!(output, " ...")?;
+            }
             write!(output, "]")?;
         }
     } else {
         write!(output, " [ARGUMENTS...]")?;
     }
-    let max_param_len = config.params.iter().filter(|param| param.argument).filter(|param| sum_arg_len > (80 - 7) || param.doc.is_some()).map(|param| param.name.len()).max().unwrap_or(0);
-    let max_switch_len = config.switches.iter().filter(|switch| sum_arg_len > (80 - 7) || switch.doc.is_some()).map(|switch| switch.name.len() + if switch.is_inverted() { 3 } else { 0 }).max().unwrap_or(0);
+    let max_param_len = config.params.iter().filter(|param| param.argument).filter(|param| sum_arg_len > (80 - 7) || param.doc.is_some()).map(|param| param.name.len() + if param.abbr.is_some() { 4 } else { 0 }).max().unwrap_or(0);
+    let max_switch_len = config.switches.iter().filter(|switch| sum_arg_len > (80 - 7) || switch.doc.is_some()).map(|switch| switch.name.len() + match switch.kind {
+        SwitchKind::Normal { abbr: Some(_), .. } => 4,
+        SwitchKind::Inverted => 3,
+        _ => 0,
+    }).max().unwrap_or(0);
     let max_arg_len = ::std::cmp::max(max_param_len, max_switch_len);
     let doc_start = 8 + 2 + max_arg_len + 4;
     if max_arg_len > 0 {
         write!(output, "\\n\\nArguments:")?;
-        let params = config.params.iter().filter(|param| param.argument).map(|param| (&param.name, &param.doc, false));
-        let switches = config.switches.iter().map(|switch| (&switch.name, &switch.doc, switch.is_inverted()));
-        for (name, doc, is_inverted_switch) in params.chain(switches) {
+        let params = config.params.iter().filter(|param| param.argument).map(|param| (&param.name, &param.doc, SwitchKind::Normal { abbr: None, count: false }));
+        let switches = config.switches.iter().map(|switch| (&switch.name, &switch.doc, switch.kind));
+        for (name, doc, switch_kind) in params.chain(switches) {
             if let Some(doc) = doc {
                 if doc.len() > 0 || sum_arg_len > (80 - 7) {
-                    write!(output, "\\n        --")?;
-                    let name_len = if is_inverted_switch {
-                        write!(output, "no-")?;
-                        name.len() + 3
-                    } else {
-                        name.len()
+                    let name_len = match switch_kind {
+                        SwitchKind::Normal { abbr: Some(abbr), .. } => {
+                            write!(output, "\\n        -{}, --", abbr)?;
+                            name.len() + 4
+                        },
+                        SwitchKind::Normal { abbr: None, .. } => {
+                            write!(output, "\\n        --")?;
+                            name.len()
+                        },
+                        SwitchKind::Inverted => {
+                            write!(output, "\\n        --no-")?;
+                            name.len() + 3
+                        },
                     };
 
                     underscore_to_hypen(&mut output, name)?;
@@ -187,7 +213,12 @@ fn gen_display_arg_parse_error<W: Write>(config: &Config, mut output: W) -> fmt:
                     }
                 }
             } else if sum_arg_len > (80 - 7) {
-                    write!(output, "        --")?;
+                    match switch_kind {
+                        SwitchKind::Normal { abbr: Some(abbr), .. } => write!(output, "\\n        -{}, --", abbr)?,
+                        SwitchKind::Normal { abbr: None, .. } => write!(output, "\\n        --")?,
+                        SwitchKind::Inverted => write!(output, "no-")?,
+                    }
+
                     underscore_to_hypen(&mut output, name)?;
                     write!(output, "\\n")?;
             }
