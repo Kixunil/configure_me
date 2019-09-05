@@ -23,7 +23,7 @@ fn main() {
     let out_dir = format!("{}/expected_outputs", out_dir);
     std::fs::create_dir_all(&out_dir).unwrap();
 
-    let tests = ["empty", "single_optional_param", "single_mandatory_param", "single_default_param", "single_switch", "multiple_params", "no_arg"];
+    let tests = ["empty", "single_optional_param", "single_mandatory_param", "single_default_param", "single_switch", "multiple_params", "no_arg", "short_switches"];
 
     for test in &tests {
         process_template(test, &out_dir);

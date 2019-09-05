@@ -144,6 +144,18 @@ mod raw {
                 } else if (arg == *"--help") || (arg == *"-h") {
                     return Err(ArgParseError::HelpRequested(self._program_path.as_ref().unwrap().to_string_lossy().into()).into());
 <<"merge_args.rs">>
+                } else if let Some(mut shorts) = ::configure_me::parse_arg::iter_short(&arg) {
+                    for short in &mut shorts {
+                        if short == 'h' {
+                            return Err(ArgParseError::HelpRequested(self._program_path.as_ref().unwrap().to_string_lossy().into()).into())
+<<"merge_short_args.rs">>
+                        } else {
+                            let mut arg = String::with_capacity(2);
+                            arg.push('-');
+                            arg.push(short);
+                            return Err(ArgParseError::UnknownArgument(arg).into());
+                        }
+                    }
                 } else if arg.to_str().unwrap_or("").starts_with("--") {
                     return Err(ArgParseError::UnknownArgument(arg.into_string().unwrap()).into());
                 } else {

@@ -1,0 +1,5 @@
+        d: Option<String>,
+        e: Option<String>,
+        a: Option<bool>,
+        b: Option<bool>,
+        c: Option<u32>,

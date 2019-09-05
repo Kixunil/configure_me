@@ -248,6 +248,34 @@ type = "u32"
 argument = false
 "#;
 
+    pub const SHORT_SWITCHES: &str =
+r#"
+[[switch]]
+name = "a"
+abbr = "a"
+
+[[switch]]
+name = "b"
+abbr = "b"
+
+[[switch]]
+name = "c"
+abbr = "c"
+count = true
+
+[[param]]
+name = "d"
+type = "String"
+abbr = "d"
+optional = true
+
+[[param]]
+name = "e"
+type = "String"
+abbr = "e"
+optional = true
+"#;
+
     pub struct ExpectedOutput {
         pub raw_config: &'static str,
         pub validate: &'static str,
@@ -302,6 +330,15 @@ argument = false
         arg_parse_error: include_str!("../tests/expected_outputs/single_switch/arg_parse_error.rs"),
     };
 
+    pub const EXPECTED_SHORT_SWITCHES: ExpectedOutput = ExpectedOutput {
+        raw_config: include_str!("../tests/expected_outputs/short_switches/raw_config.rs"),
+        validate: include_str!("../tests/expected_outputs/short_switches/validate.rs"),
+        merge_in: include_str!("../tests/expected_outputs/short_switches/merge_in.rs"),
+        merge_args: include_str!("../tests/expected_outputs/short_switches/merge_args.rs"),
+        config: include_str!("../tests/expected_outputs/short_switches/config.rs"),
+        arg_parse_error: include_str!("../tests/expected_outputs/short_switches/arg_parse_error.rs"),
+    };
+
     fn check(src: &str, expected: &str) {
         let mut src = src.as_bytes();
         let mut out = Vec::new();
@@ -342,5 +379,10 @@ argument = false
     #[test]
     fn no_arg() {
         check(NO_ARG, include_str!(concat!(env!("OUT_DIR"), "/expected_outputs/no_arg-config.rs")));
+    }
+
+    #[test]
+    fn short_switches() {
+        check(SHORT_SWITCHES, include_str!(concat!(env!("OUT_DIR"), "/expected_outputs/short_switches-config.rs")));
     }
 }

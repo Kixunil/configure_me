@@ -27,6 +27,25 @@ pub(crate) fn switch_long(switch: &::config::Switch) -> String {
     res
 }
 
+pub(crate) fn param_short(param: &::config::Param) -> Option<String> {
+    let abbr = param.abbr?;
+    let mut res = String::with_capacity(2);
+    res.push('-');
+    res.push(abbr);
+    Some(res)
+}
+
+pub(crate) fn switch_short(switch: &::config::Switch) -> Option<String> {
+    if let ::config::SwitchKind::Normal { abbr: Some(abbr), .. } = switch.kind {
+        let mut res = String::with_capacity(2);
+        res.push('-');
+        res.push(abbr);
+        Some(res)
+    } else {
+        None
+    }
+}
+
 fn gen_raw_params<W: Write>(config: &Config, mut output: W) -> fmt::Result {
     for param in &config.params {
         writeln!(output, "        {}: Option<{}>,", param.name, param.ty)?;
@@ -386,6 +405,50 @@ fn gen_arg_parse_switches<W: Write>(config: &Config, mut output: W) -> fmt::Resu
     Ok(())
 }
 
+fn gen_arg_parse_short_params<W: Write>(config: &Config, mut output: W) -> fmt::Result {
+    for param in &config.params {
+        if !param.argument {
+            continue;
+        }
+
+        let short = if let Some(short) = param.abbr {
+            short
+        } else {
+            continue;
+        };
+
+        writeln!(output, "                        }} else if short == '{}' {{", short)?;
+        write!(output, "                            self.{} = Some(shorts.parse_remaining(&mut iter).map_err(|err| err.map_or(ArgParseError::MissingArgument(\"-{}\"), ArgParseError::Field", &param.name, short)?;
+        pascal_case(&mut output, &param.name)?;
+        writeln!(output, "))?);")?;
+        writeln!(output, "                            break;")?;
+    }
+    Ok(())
+}
+
+fn gen_arg_parse_short_switches<W: Write>(config: &Config, mut output: W) -> fmt::Result {
+    use ::config::SwitchKind;
+
+    for switch in &config.switches {
+        if let SwitchKind::Normal { abbr: Some(abbr), count } = &switch.kind {
+            writeln!(output, "                        }} else if short == '{}' {{", abbr)?;
+
+            if *count {
+                writeln!(output, "                            *(self.{}.get_or_insert(0)) += 1;", switch.name)?;
+            } else {
+                writeln!(output, "                            self.{} = Some(true);", switch.name)?;
+            }
+        }
+    }
+    Ok(())
+}
+
+fn gen_merge_short_args<W: Write>(config: &Config, mut output: W) -> fmt::Result {
+    gen_arg_parse_short_params(config, &mut output)?;
+    gen_arg_parse_short_switches(config, &mut output)?;
+    Ok(())
+}
+
 fn gen_merge_env<W: Write>(config: &Config, mut output: W) -> fmt::Result {
     for param in &config.params {
         if !param.env_var {
@@ -578,6 +641,18 @@ pub fn generate_code<W: Write>(config: &Config, mut output: W) -> fmt::Result {
     writeln!(output, "                }} else if (arg == *\"--help\") || (arg == *\"-h\") {{")?;
     writeln!(output, "                    return Err(ArgParseError::HelpRequested(self._program_path.as_ref().unwrap().to_string_lossy().into()).into());")?;
     gen_merge_args(config, &mut output)?;
+    writeln!(output, "                }} else if let Some(mut shorts) = ::configure_me::parse_arg::iter_short(&arg) {{")?;
+    writeln!(output, "                    for short in &mut shorts {{")?;
+    writeln!(output, "                        if short == 'h' {{")?;
+    writeln!(output, "                            return Err(ArgParseError::HelpRequested(self._program_path.as_ref().unwrap().to_string_lossy().into()).into())")?;
+    gen_merge_short_args(config, &mut output)?;
+    writeln!(output, "                        }} else {{")?;
+    writeln!(output, "                            let mut arg = String::with_capacity(2);")?;
+    writeln!(output, "                            arg.push('-');")?;
+    writeln!(output, "                            arg.push(short);")?;
+    writeln!(output, "                            return Err(ArgParseError::UnknownArgument(arg).into());")?;
+    writeln!(output, "                        }}")?;
+    writeln!(output, "                    }}")?;
     writeln!(output, "                }} else if arg.to_str().unwrap_or(\"\").starts_with(\"--\") {{")?;
     writeln!(output, "                    return Err(ArgParseError::UnknownArgument(arg.into_string().unwrap()).into());")?;
     writeln!(output, "                }} else {{")?;
@@ -719,4 +794,13 @@ mod tests {
         check!(gen_arg_parse_error, &config_empty(), expected);
     }
 
+    #[test]
+    fn short_switches_raw_config() {
+        check!(gen_raw_config, &config_from(::tests::SHORT_SWITCHES), ::tests::EXPECTED_SHORT_SWITCHES.raw_config);
+    }
+
+    #[test]
+    fn short_switches_merge_args() {
+        check!(gen_merge_args, &config_from(::tests::SHORT_SWITCHES), ::tests::EXPECTED_SHORT_SWITCHES.merge_args);
+    }
 }

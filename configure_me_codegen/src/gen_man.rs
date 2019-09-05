@@ -42,6 +42,11 @@ fn generate_params(man: Manual, config: &Config) -> Manual {
         .iter()
         .filter(|param| param.argument).map(|param| {
             let opt = Opt::new(&param.name.to_uppercase()).long(&::codegen::param_long(param));
+            let opt = if let Some(short) = ::codegen::param_short(param) {
+                opt.short(&short)
+            } else {
+                opt
+            };
             let opt = if let Some(doc) = &param.doc {
                 opt.help(&doc)
             } else {
@@ -64,6 +69,11 @@ fn generate_switches(man: Manual, config: &Config) -> Manual {
         .map(|switch| {
             let flag = Flag::new()
                 .long(&::codegen::switch_long(switch));
+            let flag = if let Some(short) = ::codegen::switch_short(switch) {
+                flag.short(&short)
+            } else {
+                flag
+            };
             let flag = if let Some(doc) = &switch.doc {
                 flag.help(&doc)
             } else {
