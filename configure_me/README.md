@@ -66,12 +66,12 @@ Add dependencies to `Cargo.toml`:
 build = "build.rs"
 
 [dependencies]
-configure_me = "0.3.1"
+configure_me = "0.3.2"
 # Yes, this must be here too.
 serde = "1"
 
 [build-dependencies]
-configure_me_codegen = "0.3.2"
+configure_me_codegen = "0.3.3"
 ```
 
 And finally add appropriate incantiations into `src/main.rs`:
@@ -96,8 +96,8 @@ Planned features
 
 This crate is unfinished and there are features I definitelly want:
 
-* Support for documenting your configuration very well
-* Support environment variables
+* Support for documenting your configuration very well - done
+* Support environment variables - done
 * Generate bash completion
 * Some advanced features
 
