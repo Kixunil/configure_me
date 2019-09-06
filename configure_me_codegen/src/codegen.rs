@@ -98,9 +98,15 @@ fn gen_env_parse_error<W: Write>(config: &Config, mut output: W) -> fmt::Result 
             continue;
         }
 
-        write!(output, "    Field")?;
-        pascal_case(&mut output, &switch.name)?;
-        writeln!(output, "(::std::ffi::OsString),")?;
+        if switch.is_count() {
+            write!(output, "    Field")?;
+            pascal_case(&mut output, &switch.name)?;
+            writeln!(output, "(<u32 as ::configure_me::parse_arg::ParseArg>::Error),")?;
+        } else {
+            write!(output, "    Field")?;
+            pascal_case(&mut output, &switch.name)?;
+            writeln!(output, "(::std::ffi::OsString),")?;
+        }
     }
     Ok(())
 }
@@ -269,7 +275,7 @@ fn gen_display_env_parse_error<W: Write>(config: &Config, mut output: W) -> fmt:
         pascal_case(&mut output, &switch.name)?;
         writeln!(output, "(ref err) => {{")?;
         if switch.is_count() {
-            write!(output, "            write!(f, \"Invalid value '{{:?}}' for '")?;
+            write!(output, "            write!(f, \"Invalid value for '")?;
             upper_case(&mut output, &switch.name)?;
             writeln!(output, "': {{}}.\\n\\nHint: the value must be \", err)?;")?;
             writeln!(output, "            <u32 as ::configure_me::parse_arg::ParseArg>::describe_type(&mut *f)?;")?;
@@ -504,10 +510,9 @@ fn gen_merge_env<W: Write>(config: &Config, mut output: W) -> fmt::Result {
         upper_case(&mut output, &switch.name)?;
         writeln!(output, "\") {{")?;
         if switch.is_count() {
-            writeln!(output, "            let val= <u32 as ::parse_arg::ParseArg>::parse_arg(&val).map_err(|err| super::EnvParseError::Field")?;
-            write!(output, "                return Err(super::EnvParseError::Field")?;
+            write!(output, "            let val= <u32 as ::configure_me::parse_arg::ParseArg>::parse_owned_arg(val).map_err(super::EnvParseError::Field")?;
             pascal_case(&mut output, &switch.name)?;
-            writeln!(output, "(val).into());")?;
+            writeln!(output, ")?;")?;
             writeln!(output, "            self.{} = Some(val);", switch.name)?;
         } else {
             writeln!(output, "            if val == *\"1\" || val == *\"true\" {{")?;
