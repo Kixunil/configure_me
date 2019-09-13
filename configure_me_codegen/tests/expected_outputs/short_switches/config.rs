@@ -3,3 +3,4 @@
     pub a: bool,
     pub b: bool,
     pub c: u32,
+    pub foo_bar: bool,

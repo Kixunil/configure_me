@@ -275,6 +275,10 @@ name = "e"
 type = "String"
 abbr = "e"
 optional = true
+
+[[switch]]
+name = "foo_bar"
+abbr = "f"
 "#;
 
     pub struct ExpectedOutput {

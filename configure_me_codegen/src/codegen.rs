@@ -427,10 +427,14 @@ fn gen_merge_args<W: Write>(config: &Config, mut output: W) -> fmt::Result {
 fn gen_arg_parse_switches<W: Write>(config: &Config, mut output: W) -> fmt::Result {
     for switch in &config.switches {
         if switch.is_inverted() {
-            writeln!(output, "                }} else if arg == *\"--no-{}\" {{", switch.name)?;
+            write!(output, "                }} else if arg == *\"--no-")?;
+            underscore_to_hypen(&mut output, &switch.name)?;
+            writeln!(output, "\" {{")?;
             writeln!(output, "                    self.{} = Some(false);", switch.name)?;
         } else {
-            writeln!(output, "                }} else if arg == *\"--{}\" {{", switch.name)?;
+            write!(output, "                }} else if arg == *\"--")?;
+            underscore_to_hypen(&mut output, &switch.name)?;
+            writeln!(output, "\" {{")?;
 
             if switch.is_count() {
                 writeln!(output, "                    *(self.{}.get_or_insert(0)) += 1;", switch.name)?;
