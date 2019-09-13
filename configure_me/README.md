@@ -71,7 +71,7 @@ configure_me = "0.3.2"
 serde = "1"
 
 [build-dependencies]
-configure_me_codegen = "0.3.3"
+configure_me_codegen = "0.3.5"
 ```
 
 And finally add appropriate incantiations into `src/main.rs`:
