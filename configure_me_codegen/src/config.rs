@@ -1,3 +1,5 @@
+use std::fmt;
+
 #[derive(Debug)]
 pub enum ValidationErrorKind {
     MandatoryWithDefault,
@@ -10,6 +12,21 @@ pub enum ValidationErrorKind {
 pub struct ValidationError {
     name: String,
     kind: ValidationErrorKind,
+}
+
+impl fmt::Display for ValidationError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        use self::ValidationErrorKind::*;
+
+        let msg = match self.kind {
+            MandatoryWithDefault => "parameter with default value must be optional",
+            InvertedWithAbbr => "inverted switch can't have short option",
+            InvertedWithCount => "inverted switch can't be count",
+            InvalidAbbr => "invalid short switch: must be [a-zA-Z]",
+        };
+
+        write!(f, "invalid configuration for field {}: {}", self.name, msg)
+    }
 }
 
 pub mod raw {

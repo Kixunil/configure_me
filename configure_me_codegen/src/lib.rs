@@ -21,6 +21,7 @@ pub(crate) mod codegen;
 #[cfg(feature = "man")]
 pub (crate) mod gen_man;
 
+use std::fmt;
 use std::io::{self, Read, Write};
 use std::path::{Path, PathBuf};
 
@@ -34,12 +35,27 @@ enum ErrorData {
 }
 
 /// Error that occured during code generation
-///
-/// It currently only implements Debug, which should
-/// be sufficient for now. This may be improved in the future.
-#[derive(Debug)]
 pub struct Error {
     data: ErrorData,
+}
+
+impl fmt::Display for Error {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match &self.data {
+            ErrorData::Toml(err) => write!(f, "failed to parse config specification: {}", err),
+            ErrorData::Config(err) => fmt::Display::fmt(err, f),
+            ErrorData::Io(err) => write!(f, "I/O error: {}", err),
+            ErrorData::Open { file, error } => write!(f, "failed to open file {}: {}", file.display(), error),
+            ErrorData::MissingOutDir => write!(f, "missing environment variable: OUT_DIR"),
+        }
+    }
+}
+
+/// Implemented using `Display` so that it can be used with `Termination` to display nicer message.
+impl fmt::Debug for Error {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        fmt::Display::fmt(self, f)
+    }
 }
 
 impl From<ErrorData> for Error {
