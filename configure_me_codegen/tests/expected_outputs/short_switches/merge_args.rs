@@ -12,3 +12,5 @@
                     self.b = Some(true);
                 } else if arg == *"--c" {
                     *(self.c.get_or_insert(0)) += 1;
+                } else if arg == *"--foo-bar" {
+                    self.foo_bar = Some(true);

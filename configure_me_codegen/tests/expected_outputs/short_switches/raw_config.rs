@@ -3,3 +3,4 @@
         a: Option<bool>,
         b: Option<bool>,
         c: Option<u32>,
+        foo_bar: Option<bool>,

@@ -13,3 +13,6 @@
             if self.c.is_none() {
                 self.c = other.c;
             }
+            if self.foo_bar.is_none() {
+                self.foo_bar = other.foo_bar;
+            }

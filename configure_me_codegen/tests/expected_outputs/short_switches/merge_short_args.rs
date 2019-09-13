@@ -10,3 +10,5 @@
                             self.b = Some(true);
                         } else if short == 'c' {
                             *(self.c.get_or_insert(0)) += 1;
+                        } else if short == 'f' {
+                            self.foo_bar = Some(true);
