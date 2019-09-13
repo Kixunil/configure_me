@@ -13,7 +13,21 @@ pub struct ValidationError {
 }
 
 pub mod raw {
-    use super::{ValidationError, ValidationErrorKind};
+    use super::{ValidationError, ValidationErrorKind, Optionality, SwitchKind};
+
+    trait ResultExt {
+        type Item;
+
+        fn field_name(self, name: &str) -> Result<Self::Item, ValidationError>;
+    }
+
+    impl<T> ResultExt for Result<T, ValidationErrorKind> {
+        type Item = T;
+
+        fn field_name(self, name: &str) -> Result<Self::Item, ValidationError> {
+            self.map_err(|kind| ValidationError { name: name.to_owned(), kind })
+        }
+    }
 
     #[derive(Debug)]
     #[derive(Deserialize)]
@@ -60,7 +74,7 @@ pub mod raw {
     #[serde(deny_unknown_fields)]
     pub struct Param {
         name: String,
-        abbr: Option<String>,
+        abbr: Option<char>,
         #[serde(rename = "type")]
         ty: String,
         optional: Option<bool>,
@@ -72,32 +86,20 @@ pub mod raw {
     }
 
     impl Param {
+        fn validate_optionality(optional: Option<bool>, default_optional: bool, default: Option<String>) -> Result<Optionality, ValidationErrorKind> {
+            match (optional, default_optional, default) {
+                (Some(false), _, None) => Ok(Optionality::Mandatory),
+                (Some(false), _, Some(_)) => Err(ValidationErrorKind::MandatoryWithDefault),
+                (Some(true), _, None) => Ok(Optionality::Optional),
+                (_, _, Some(default)) => Ok(Optionality::DefaultValue(default)),
+                (None, true, None) => Ok(Optionality::Optional),
+                (None, false, None) => Ok(Optionality::Mandatory),
+            }
+        }
+
         fn validate(self, default_optional: bool, default_argument: bool, default_env_var: bool) -> Result<super::Param, ValidationError> {
-            use super::Optionality;
-
-            let optionality = match (self.optional, default_optional, self.default) {
-                (Some(false), _, None) => Optionality::Mandatory,
-                (Some(false), _, Some(_)) => return Err(ValidationError { name: self.name, kind: ValidationErrorKind::MandatoryWithDefault, }),
-                (Some(true), _, None) => Optionality::Optional,
-                (_, _, Some(default)) => Optionality::DefaultValue(default),
-                (None, true, None) => Optionality::Optional,
-                (None, false, None) => Optionality::Mandatory,
-            };
-
-            let abbr = if let Some(mut abbr) = self.abbr {
-                let abbr_chr = abbr.pop();
-
-                if abbr.len() > 0 {
-                    return Err(ValidationError { name: self.name, kind: ValidationErrorKind::InvalidAbbr, });
-                }
-                Some(if let Some(abbr) = abbr_chr {
-                    abbr
-                } else {
-                    return Err(ValidationError { name: self.name, kind: ValidationErrorKind::InvalidAbbr, });
-                })
-            } else {
-                None
-            };
+            let optionality = Param::validate_optionality(self.optional, default_optional, self.default)
+                .field_name(&self.name)?;
 
             let ty = self.ty;
             let argument = self.argument.unwrap_or(default_argument);
@@ -108,7 +110,7 @@ pub mod raw {
                 name: self.name,
                 ty,
                 optionality,
-                abbr,
+                abbr: self.abbr,
                 doc: self.doc,
                 argument,
                 env_var,
@@ -122,34 +124,41 @@ pub mod raw {
     #[serde(deny_unknown_fields)]
     pub struct Switch {
         name: String,
-        abbr: Option<String>,
-        default: Option<bool>,
+        abbr: Option<char>,
+        #[serde(default)]
+        default: bool,
         doc: Option<String>,
         env_var: Option<bool>,
-        count: Option<bool>,
+        #[serde(default)]
+        count: bool,
     }
 
     impl Switch {
+        fn validate_abbr(abbr: char) -> Result<char, ValidationErrorKind> {
+            if (abbr >= 'a' && abbr <= 'z') || (abbr >= 'A' && abbr <= 'Z') {
+                Ok(abbr)
+            } else {
+                Err(ValidationErrorKind::InvalidAbbr)
+            }
+        }
+
+        fn validate_kind(abbr: Option<char>, default: bool, count: bool) -> Result<SwitchKind, ValidationErrorKind> {
+            match (abbr, default, count) {
+                (Some(_), true, _) => Err(ValidationErrorKind::InvertedWithAbbr),
+                (_, true, true) => Err(ValidationErrorKind::InvertedWithCount),
+                (None, true, false) => Ok(SwitchKind::Inverted),
+                (abbr, false, count) => Ok(SwitchKind::Normal { abbr, count }),
+            }
+        }
+
         fn validate(self, default_env_var: bool) -> Result<super::Switch, ValidationError> {
-            use super::SwitchKind;
+            let abbr = self.abbr
+                .map(Switch::validate_abbr)
+                .transpose()
+                .field_name(&self.name)?;
 
-            let kind = match (self.abbr, self.default, self.count) {
-                (Some(_), Some(true), _) => return Err(ValidationError { name: self.name, kind: ValidationErrorKind::InvertedWithAbbr, }),
-                (_, Some(true), Some(true)) => return Err(ValidationError { name: self.name, kind: ValidationErrorKind::InvertedWithCount, }),
-                (None, Some(true), None) | (None, Some(true), Some(false)) => SwitchKind::Inverted,
-                (abbr, _, count) => {
-                    let abbr = if let Some(mut abbr) = abbr {
-                        match abbr.pop() {
-                            Some(chr) if abbr.len() == 0 && ((chr >= 'a' && chr <= 'z') || (chr >= 'A' && chr <= 'Z')) => Some(chr),
-                            _ => return Err(ValidationError { name: self.name.clone(), kind: ValidationErrorKind::InvalidAbbr, }),
-                        }
-                    } else {
-                        None
-                    };
-
-                    SwitchKind::Normal { abbr, count: count.unwrap_or(false) }
-                },
-            };
+            let kind = Switch::validate_kind(abbr, self.default, self.count)
+                .field_name(&self.name)?;
 
             Ok(super::Switch {
                 name: self.name,
