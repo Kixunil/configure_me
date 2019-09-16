@@ -111,6 +111,7 @@ mod raw {
     use super::{ArgParseError, ValidationError};
 
     #[derive(Deserialize, Default)]
+    #[serde(crate = "crate::configure_me::serde")]
     pub struct Config {
         _program_path: Option<PathBuf>,
 <<"raw_config.rs">>
