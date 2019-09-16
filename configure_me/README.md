@@ -35,7 +35,7 @@ doc = "Port to listen on."
 
 [[param]]
 name = "bind_addr"
-type = "::std::net::Ipv4Addr" # Yes, this works and  you can use your own types implementing Deserialize and FromStr as well!
+type = "::std::net::Ipv4Addr" # Yes, this works and  you can use your own types implementing Deserialize and ParseArg as well!
 default = "::std::net::Ipv4Addr::new(0, 0, 0, 0)" # Rust expression that creates the value
 doc = "IP address to bind to."
 
@@ -66,12 +66,10 @@ Add dependencies to `Cargo.toml`:
 build = "build.rs"
 
 [dependencies]
-configure_me = "0.3.2"
-# Yes, this must be here too.
-serde = "1"
+configure_me = "0.3.3"
 
 [build-dependencies]
-configure_me_codegen = "0.3.5"
+configure_me_codegen = "0.3.6"
 ```
 
 And finally add appropriate incantiations into `src/main.rs`:

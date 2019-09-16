@@ -32,7 +32,7 @@
 //! 
 //! [[param]]
 //! name = "bind_addr"
-//! # Yes, this works and  you can use your own T: Deserialize + FromStr as well!
+//! # Yes, this works and  you can use your own T: Deserialize + ParseArg as well!
 //! type = "::std::net::Ipv4Addr" 
 //! default = "::std::net::Ipv4Addr::new(0, 0, 0, 0)" # Rust expression that creates the value
 //! doc = "IP address to bind to."
@@ -65,8 +65,6 @@
 //! 
 //! [dependencies]
 //! configure_me = "0.3"
-//! # Yes, this must be here too.
-//! serde = "1"
 //! 
 //! [build-dependencies]
 //! configure_me_codegen = "0.3"

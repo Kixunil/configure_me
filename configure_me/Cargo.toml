@@ -1,6 +1,6 @@
 [package]
 name = "configure_me"
-version = "0.3.2"
+version = "0.3.3"
 authors = ["Martin Habovstiak <martin.habovstiak@gmail.com>"]
 description = "A library for processing application configuration easily."
 homepage = "https://github.com/Kixunil/configure_me"
