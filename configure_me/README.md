@@ -69,7 +69,7 @@ build = "build.rs"
 configure_me = "0.3.3"
 
 [build-dependencies]
-configure_me_codegen = "0.3.7"
+configure_me_codegen = "0.3.8"
 ```
 
 And finally add appropriate incantiations into `src/main.rs`:

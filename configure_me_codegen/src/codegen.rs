@@ -500,7 +500,8 @@ fn gen_parse_conf_file_params<W: Write>(config: &Config, mut output: W) -> fmt::
         write!(output, "                    let file_path: std::path::PathBuf = value.map_err(|err| err.map_or(ArgParseError::MissingArgument(\"--")?;
         underscore_to_hypen(&mut output, &conf_file)?;
         writeln!(output, "\"), |never| match never {{}}))?;")?;
-        writeln!(output, "                    let config = Config::load(file_path)?;")?;
+        writeln!(output, "                    let mut config = Config::load(file_path)?;")?;
+        writeln!(output, "                    std::mem::swap(self, &mut config);")?;
         writeln!(output, "                    self.merge_in(config);")?;
     }
 
@@ -523,7 +524,8 @@ fn gen_parse_conf_file_params<W: Write>(config: &Config, mut output: W) -> fmt::
         writeln!(output, "                            Err(err) => return Err(ArgParseError::ReadConfDir(err, dir_path).into()),")?;
         writeln!(output, "                        }};")?;
         writeln!(output)?;
-        writeln!(output, "                        let config = Config::load(file.path())?;")?;
+        writeln!(output, "                        let mut config = Config::load(file.path())?;")?;
+        writeln!(output, "                        std::mem::swap(self, &mut config);")?;
         writeln!(output, "                        self.merge_in(config);")?;
         writeln!(output, "                    }}")?;
     }

@@ -1,6 +1,7 @@
                 } else if let Some(value) = ::configure_me::parse_arg::match_arg("--config", &arg, &mut iter) {
                     let file_path: std::path::PathBuf = value.map_err(|err| err.map_or(ArgParseError::MissingArgument("--config"), |never| match never {}))?;
-                    let config = Config::load(file_path)?;
+                    let mut config = Config::load(file_path)?;
+                    std::mem::swap(self, &mut config);
                     self.merge_in(config);
                 } else if let Some(value) = ::configure_me::parse_arg::match_arg("--conf-dir", &arg, &mut iter) {
                     let dir_path: std::path::PathBuf = value.map_err(|err| err.map_or(ArgParseError::MissingArgument("--conf-dir"), |never| match never {}))?;
@@ -16,7 +17,8 @@
                             Err(err) => return Err(ArgParseError::ReadConfDir(err, dir_path).into()),
                         };
 
-                        let config = Config::load(file.path())?;
+                        let mut config = Config::load(file.path())?;
+                        std::mem::swap(self, &mut config);
                         self.merge_in(config);
                     }
                 } else if let Some(value) = ::configure_me::parse_arg::match_arg("--foo", &arg, &mut iter) {
