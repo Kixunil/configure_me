@@ -36,6 +36,26 @@ fn generate_meta(config: &Config) -> Manual {
     })
 }
 
+fn generate_conf_file_param(man: Manual, config: &Config) -> Manual {
+    if let Some(conf_file_param) = &config.general.conf_file_param {
+        let opt = Opt::new("CONFIG_FILE").long(&::codegen::param_long_raw(conf_file_param));
+        let opt = opt.help("Loads configuration from the specified CONFIG_FILE.");
+        man.option(opt)
+    } else {
+        man
+    }
+}
+
+fn generate_conf_dir_param(man: Manual, config: &Config) -> Manual {
+    if let Some(conf_dir_param) = &config.general.conf_dir_param {
+        let opt = Opt::new("CONFIG_DIR").long(&::codegen::param_long_raw(conf_dir_param));
+        let opt = opt.help("Loads configuration from all files in the directory CONFIG_DIR.");
+        man.option(opt)
+    } else {
+        man
+    }
+}
+
 fn generate_params(man: Manual, config: &Config) -> Manual {
     config
         .params
@@ -135,6 +155,8 @@ pub fn generate_man_page(config: &Config) -> String {
     } else {
         man
     };
+    let man = generate_conf_file_param(man, config);
+    let man = generate_conf_dir_param(man, config);
     let man = generate_params(man, config);
     let man = generate_switches(man, config);
     let man = generate_param_env_vars(man, config);

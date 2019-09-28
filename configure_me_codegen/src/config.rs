@@ -202,10 +202,32 @@ pub struct Config {
 #[derive(Deserialize, Default)]
 #[serde(deny_unknown_fields)]
 pub struct General {
+    /// Name of the program
     pub name: Option<String>,
+
+    /// Short description of the program
     pub summary: Option<String>,
+
+    /// Long description of the program
     pub doc: Option<String>,
+
+    /// Prefix for all env vars - enables
+    /// all env vars by default if present
     pub env_prefix: Option<String>,
+
+    /// The name of the parameter which, if
+    /// specified causes parameter parsing to
+    /// immediately load a config file, parse
+    /// it, and override all configuration
+    /// provided so far with that file.
+    pub conf_file_param: Option<String>,
+
+    /// The name of the parameter which, if
+    /// specified causes parameter parsing to
+    /// immediately load all files from the
+    /// directory, parse them, and override all
+    /// configuration provided so far with them.
+    pub conf_dir_param: Option<String>,
 }
 
 #[derive(Debug)]

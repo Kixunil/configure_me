@@ -297,6 +297,20 @@ name = "foo_bar"
 abbr = "f"
 "#;
 
+    pub const CONF_FILES: &str =
+r#"
+[general]
+env_prefix = "TEST_APP"
+conf_file_param = "config"
+conf_dir_param = "conf_dir"
+
+[[param]]
+name = "foo"
+type = "u32"
+default = "42"
+doc = "A foo"
+"#;
+
     pub struct ExpectedOutput {
         pub raw_config: &'static str,
         pub validate: &'static str,
@@ -405,5 +419,10 @@ abbr = "f"
     #[test]
     fn short_switches() {
         check(SHORT_SWITCHES, include_str!(concat!(env!("OUT_DIR"), "/expected_outputs/short_switches-config.rs")));
+    }
+
+    #[test]
+    fn conf_files() {
+        check(CONF_FILES, include_str!(concat!(env!("OUT_DIR"), "/expected_outputs/conf_files-config.rs")));
     }
 }

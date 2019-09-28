@@ -2,13 +2,17 @@ use std::fmt::{self, Write};
 use ::config::{Config, Optionality};
 use ::unicode_segmentation::UnicodeSegmentation;
 
-pub(crate) fn param_long(param: &::config::Param) -> String {
-    let mut res = String::with_capacity(param.name.len() + 2);
+pub(crate) fn param_long_raw(param: &str) -> String {
+    let mut res = String::with_capacity(param.len() + 2);
     res.push_str("--");
                                             // Writing to String never fails
-    underscore_to_hypen(&mut res, &param.name).unwrap();
+    underscore_to_hypen(&mut res, &param).unwrap();
 
     res
+}
+
+pub(crate) fn param_long(param: &::config::Param) -> String {
+    param_long_raw(&param.name)
 }
 
 pub(crate) fn switch_long(switch: &::config::Switch) -> String {
@@ -80,6 +84,10 @@ fn gen_arg_parse_error<W: Write>(config: &Config, mut output: W) -> fmt::Result 
         pascal_case(&mut output, &param.name)?;
         writeln!(output, "(<{} as ::configure_me::parse_arg::ParseArg>::Error),", param.ty)?;
     }
+    if config.general.conf_dir_param.is_some() {
+        writeln!(output, "    OpenConfDir(std::io::Error, std::path::PathBuf),")?;
+        writeln!(output, "    ReadConfDir(std::io::Error, std::path::PathBuf),")?;
+    }
     Ok(())
 }
 
@@ -131,11 +139,33 @@ fn gen_display_arg_parse_error<W: Write>(config: &Config, mut output: W) -> fmt:
         .switches
         .iter()
         .map(|switch| switch.name.len() + if switch.is_inverted() { 8 } else { 5 })
-        .sum::<usize>();
+        .sum::<usize>()
+        + config
+        .general
+        .conf_file_param
+        .as_ref()
+        .map(|param| param.len() + 6 + 9)
+        .unwrap_or(0)
+        + config
+        .general
+        .conf_dir_param
+        .as_ref()
+        .map(|param| param.len() + 6 + 8)
+        .unwrap_or(0);
 
     write!(output, "        ArgParseError::HelpRequested(program_name) => write!(f, \"Usage: {{}}")?;
     // Standard width of the terminal - "Usage: ".len()
     if sum_arg_len < (80 - 7) {
+        if let Some(conf_file_param) = &config.general.conf_file_param {
+            write!(output, " [--")?;
+            underscore_to_hypen(&mut output, &conf_file_param)?;
+            write!(output, " CONF_FILE]")?;
+        }
+        if let Some(conf_dir_param) = &config.general.conf_dir_param {
+            write!(output, " [--")?;
+            underscore_to_hypen(&mut output, &conf_dir_param)?;
+            write!(output, " CONF_DIR]")?;
+        }
         for param in config.params.iter().filter(|param| param.argument) {
             if let Some(abbr) = &param.abbr {
                 write!(output, " [-{} ", abbr)?;
@@ -167,19 +197,59 @@ fn gen_display_arg_parse_error<W: Write>(config: &Config, mut output: W) -> fmt:
     } else {
         write!(output, " [ARGUMENTS...]")?;
     }
-    let max_param_len = config.params.iter().filter(|param| param.argument).filter(|param| sum_arg_len > (80 - 7) || param.doc.is_some()).map(|param| param.name.len() + if param.abbr.is_some() { 4 } else { 0 }).max().unwrap_or(0);
-    let max_switch_len = config.switches.iter().filter(|switch| sum_arg_len > (80 - 7) || switch.doc.is_some()).map(|switch| switch.name.len() + match switch.kind {
-        SwitchKind::Normal { abbr: Some(_), .. } => 4,
-        SwitchKind::Inverted => 3,
-        _ => 0,
-    }).max().unwrap_or(0);
+    let conf_files = config
+        .general.conf_file_param
+        .as_ref()
+        .into_iter()
+        .chain(config.general.conf_dir_param.as_ref())
+        .map(|arg| arg.len());
+
+    let max_param_len = config
+        .params
+        .iter()
+        .filter(|param| param.argument)
+        .filter(|param| sum_arg_len > (80 - 7) || param.doc.is_some())
+        .map(|param| param.name.len() + if param.abbr.is_some() { 4 } else { 0 })
+        .chain(conf_files)
+        .max()
+        .unwrap_or(0);
+    let max_switch_len = config
+        .switches
+        .iter()
+        .filter(|switch| sum_arg_len > (80 - 7) || switch.doc.is_some())
+        .map(|switch| switch.name.len() + match switch.kind {
+            SwitchKind::Normal { abbr: Some(_), .. } => 4,
+            SwitchKind::Inverted => 3,
+            _ => 0,
+        })
+        .max()
+        .unwrap_or(0);
     let max_arg_len = ::std::cmp::max(max_param_len, max_switch_len);
     let doc_start = 8 + 2 + max_arg_len + 4;
     if max_arg_len > 0 {
         write!(output, "\\n\\nArguments:")?;
-        let params = config.params.iter().filter(|param| param.argument).map(|param| (&param.name, &param.doc, SwitchKind::Normal { abbr: None, count: false }));
-        let switches = config.switches.iter().map(|switch| (&switch.name, &switch.doc, switch.kind));
-        for (name, doc, switch_kind) in params.chain(switches) {
+        let conf_file = config
+            .general.conf_file_param
+            .as_ref()
+            .map(|arg| (arg, Some("Load configuration from this file."), SwitchKind::Normal { abbr: None, count: false }))
+            .into_iter();
+        let conf_dir = config
+            .general.conf_dir_param
+            .as_ref()
+            .map(|arg| (arg, Some("Load configuration from files in this directory."), SwitchKind::Normal { abbr: None, count: false }))
+            .into_iter();
+
+        let params = config
+            .params
+            .iter()
+            .filter(|param| param.argument)
+            .map(|param| (&param.name, param.doc.as_ref().map(AsRef::as_ref), SwitchKind::Normal { abbr: param.abbr, count: false }));
+        let switches = config
+            .switches
+            .iter()
+            .map(|switch| (&switch.name, switch.doc.as_ref().map(AsRef::as_ref), switch.kind));
+
+        for (name, doc, switch_kind) in conf_file.chain(conf_dir).chain(params).chain(switches) {
             if let Some(doc) = doc {
                 if doc.len() > 0 || sum_arg_len > (80 - 7) {
                     let name_len = match switch_kind {
@@ -245,6 +315,10 @@ fn gen_display_arg_parse_error<W: Write>(config: &Config, mut output: W) -> fmt:
         writeln!(output, "            <{} as ::configure_me::parse_arg::ParseArg>::describe_type(&mut *f)?;", param.ty)?;
         writeln!(output, "            write!(f, \".\")")?;
         writeln!(output, "        }},")?;
+    }
+    if config.general.conf_dir_param.is_some() {
+        writeln!(output, "        ArgParseError::OpenConfDir(err, dir) => write!(f, \"Failed to open configuration directory {{}}: {{}}\", dir.display(), err),")?;
+        writeln!(output, "        ArgParseError::ReadConfDir(err, dir) => write!(f, \"Failed to read configuration directory {{}}: {{}}\", dir.display(), err),")?;
     }
     Ok(())
 }
@@ -418,7 +492,46 @@ fn gen_arg_parse_params<W: Write>(config: &Config, mut output: W) -> fmt::Result
     Ok(())
 }
 
+fn gen_parse_conf_file_params<W: Write>(config: &Config, mut output: W) -> fmt::Result {
+    if let Some(conf_file) = &config.general.conf_file_param {
+        write!(output, "                }} else if let Some(value) = ::configure_me::parse_arg::match_arg(\"--")?;
+        underscore_to_hypen(&mut output, &conf_file)?;
+        writeln!(output, "\", &arg, &mut iter) {{")?;
+        write!(output, "                    let file_path: std::path::PathBuf = value.map_err(|err| err.map_or(ArgParseError::MissingArgument(\"--")?;
+        underscore_to_hypen(&mut output, &conf_file)?;
+        writeln!(output, "\"), |never| match never {{}}))?;")?;
+        writeln!(output, "                    let config = Config::load(file_path)?;")?;
+        writeln!(output, "                    self.merge_in(config);")?;
+    }
+
+    if let Some(conf_dir) = &config.general.conf_dir_param {
+        write!(output, "                }} else if let Some(value) = ::configure_me::parse_arg::match_arg(\"--")?;
+        underscore_to_hypen(&mut output, &conf_dir)?;
+        writeln!(output, "\", &arg, &mut iter) {{")?;
+        write!(output, "                    let dir_path: std::path::PathBuf = value.map_err(|err| err.map_or(ArgParseError::MissingArgument(\"--")?;
+        underscore_to_hypen(&mut output, &conf_dir)?;
+        writeln!(output, "\"), |never| match never {{}}))?;")?;
+        writeln!(output)?;
+        writeln!(output, "                    let dir = match std::fs::read_dir(&dir_path) {{")?;
+        writeln!(output, "                        Ok(dir) => dir,")?;
+        writeln!(output, "                        Err(err) => return Err(ArgParseError::OpenConfDir(err, dir_path).into()),")?;
+        writeln!(output, "                    }};")?;
+        writeln!(output)?;
+        writeln!(output, "                    for file in dir {{")?;
+        writeln!(output, "                        let file = match file {{")?;
+        writeln!(output, "                            Ok(file) => file,")?;
+        writeln!(output, "                            Err(err) => return Err(ArgParseError::ReadConfDir(err, dir_path).into()),")?;
+        writeln!(output, "                        }};")?;
+        writeln!(output)?;
+        writeln!(output, "                        let config = Config::load(file.path())?;")?;
+        writeln!(output, "                        self.merge_in(config);")?;
+        writeln!(output, "                    }}")?;
+    }
+    Ok(())
+}
+
 fn gen_merge_args<W: Write>(config: &Config, mut output: W) -> fmt::Result {
+    gen_parse_conf_file_params(config, &mut output)?;
     gen_arg_parse_params(config, &mut output)?;
     gen_arg_parse_switches(config, &mut output)?;
     Ok(())
