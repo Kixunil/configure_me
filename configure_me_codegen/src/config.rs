@@ -163,6 +163,8 @@ pub mod raw {
         general: super::General,
         #[serde(default)]
         defaults: super::Defaults,
+        #[cfg(feature = "debconf")]
+        debconf: Option<::debconf::DebConfig>,
     }
 
     impl Config {
@@ -185,6 +187,8 @@ pub mod raw {
                 defaults: self.defaults,
                 params,
                 switches,
+                #[cfg(feature = "debconf")]
+                debconf: self.debconf,
             })
         }
     }
@@ -203,6 +207,10 @@ pub mod raw {
         argument: Option<bool>,
         env_var: Option<bool>,
         convert_into: Option<String>,
+        #[cfg(feature = "debconf")]
+        debconf_priority: Option<::debconf::Priority>,
+        #[cfg(feature = "debconf")]
+        debconf_default: Option<String>,
     }
 
     impl Param {
@@ -235,6 +243,10 @@ pub mod raw {
                 argument,
                 env_var,
                 convert_into,
+                #[cfg(feature = "debconf")]
+                debconf_priority: self.debconf_priority,
+                #[cfg(feature = "debconf")]
+                debconf_default: self.debconf_default,
             })
         }
     }
@@ -251,6 +263,8 @@ pub mod raw {
         env_var: Option<bool>,
         #[serde(default)]
         count: bool,
+        #[cfg(feature = "debconf")]
+        debconf_priority: Option<::debconf::Priority>,
     }
 
     impl Switch {
@@ -285,6 +299,8 @@ pub mod raw {
                 kind,
                 doc: self.doc,
                 env_var: self.env_var.unwrap_or(default_env_var),
+                #[cfg(feature = "debconf")]
+                debconf_priority: self.debconf_priority,
             })
         }
     }
@@ -296,6 +312,8 @@ fn make_true() -> bool {
 
 pub struct Config {
     pub general: General,
+    #[cfg(feature = "debconf")]
+    pub debconf: Option<::debconf::DebConfig>,
     pub defaults: Defaults,
     pub params: Vec<Param>,
     pub switches: Vec<Switch>,
@@ -376,6 +394,10 @@ pub struct Param {
     pub argument: bool,
     pub env_var: bool,
     pub convert_into: String,
+    #[cfg(feature = "debconf")]
+    pub debconf_priority: Option<::debconf::Priority>,
+    #[cfg(feature = "debconf")]
+    pub debconf_default: Option<String>,
 }
 
 pub struct Switch {
@@ -383,6 +405,8 @@ pub struct Switch {
     pub kind: SwitchKind,
     pub doc: Option<String>,
     pub env_var: bool,
+    #[cfg(feature = "debconf")]
+    pub debconf_priority: Option<::debconf::Priority>,
 }
 
 impl Switch {

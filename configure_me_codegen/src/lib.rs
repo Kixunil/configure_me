@@ -20,6 +20,8 @@ pub(crate) mod config;
 pub(crate) mod codegen;
 #[cfg(feature = "man")]
 pub (crate) mod gen_man;
+#[cfg(feature = "debconf")]
+pub (crate) mod debconf;
 
 use std::fmt;
 use std::io::{self, Read, Write};
@@ -32,6 +34,8 @@ enum ErrorData {
     Io(io::Error),
     Open { file: PathBuf, error: io::Error },
     MissingOutDir,
+    #[cfg(feature = "debconf")]
+    Debconf(debconf::Error),
 }
 
 /// Error that occured during code generation
@@ -47,6 +51,8 @@ impl fmt::Display for Error {
             ErrorData::Io(err) => write!(f, "I/O error: {}", err),
             ErrorData::Open { file, error } => write!(f, "failed to open file {}: {}", file.display(), error),
             ErrorData::MissingOutDir => write!(f, "missing environment variable: OUT_DIR"),
+            #[cfg(feature = "debconf")]
+            ErrorData::Debconf(err) => write!(f, "failed to generate debconf: {}", err),
         }
     }
 }
@@ -86,6 +92,15 @@ impl From<toml::de::Error> for Error {
     fn from(err: toml::de::Error) -> Self {
         Error {
             data: ErrorData::Toml(err),
+        }
+    }
+}
+
+#[cfg(feature = "debconf")]
+impl From<debconf::Error> for Error {
+    fn from(err: debconf::Error) -> Self {
+        Error {
+            data: ErrorData::Debconf(err),
         }
     }
 }
@@ -131,6 +146,8 @@ fn generate_to_file<P: AsRef<Path> + Into<PathBuf>>(config_spec: &::config::Conf
 fn load_and_generate_default<P: AsRef<Path>>(source: P) -> Result<::config::Config, Error> {
     let config_spec = load_from_file(&source)?;
     generate_to_file(&config_spec, default_out_file()?)?;
+    #[cfg(feature = "debconf")]
+    debconf::generate_if_requested(&config_spec)?;
     println!("cargo:rerun-if-changed={}", source.as_ref().display());
     Ok(config_spec)
 }
@@ -171,6 +188,8 @@ pub fn build_script_with_man_written_to<P: AsRef<Path>, M: AsRef<Path> + Into<Pa
 
     let mut file = create_file(output)?;
     file.write_all(man_page.as_bytes())?;
+    #[cfg(feature = "debconf")]
+    debconf::generate_if_requested(&config_spec)?;
     Ok(())
 }
 
