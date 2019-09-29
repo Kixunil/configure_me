@@ -2,6 +2,274 @@ use std::fmt::{self, Write};
 use ::config::{Config, Optionality};
 use ::unicode_segmentation::UnicodeSegmentation;
 
+mod visitor {
+    use std::fmt;
+
+    pub trait VisitWrite<T> {
+        fn visit_write<W: fmt::Write>(&self, output: W) -> fmt::Result;
+    }
+
+    impl<'a, T, U> VisitWrite<T> for &'a U where U: VisitWrite<T> {
+        fn visit_write<W: fmt::Write>(&self, output: W) -> fmt::Result {
+            (*self).visit_write(output)
+        }
+    }
+
+    pub fn iter<T, I, W: fmt::Write>(iter: I, mut output: W) -> fmt::Result where I: IntoIterator, I::Item: VisitWrite<T> {
+        for item in iter {
+            item.visit_write(&mut output)?;
+        }
+        Ok(())
+    }
+
+    pub enum RawConfigDecl {}
+    pub enum ArgParseErrorDecl {}
+    pub enum EnvParseErrorDecl {}
+    pub enum ConfigFinal {}
+    pub enum Validate {}
+    pub enum ConstructConfig {}
+    pub enum MergeIn {}
+    pub enum MergeArgs {}
+    pub enum MergeShort {}
+}
+
+use self::visitor::VisitWrite;
+
+macro_rules! empty {
+    ($type:ty, $visit:ident) => {
+        impl VisitWrite<visitor::$visit> for $type {
+            fn visit_write<W: fmt::Write>(&self, _output: W) -> fmt::Result {
+                Ok(())
+            }
+        }
+    }
+}
+
+empty!(::config::General, RawConfigDecl);
+
+impl VisitWrite<visitor::RawConfigDecl> for ::config::Param {
+    fn visit_write<W: fmt::Write>(&self, mut output: W) -> fmt::Result {
+        writeln!(output, "        {}: Option<{}>,", self.name.as_snake_case(), self.ty)
+    }
+}
+
+impl VisitWrite<visitor::RawConfigDecl> for ::config::Switch {
+    fn visit_write<W: fmt::Write>(&self, mut output: W) -> fmt::Result {
+        if self.is_count() {
+            writeln!(output, "        {}: Option<u32>,", self.name.as_snake_case())
+        } else {
+            writeln!(output, "        {}: Option<bool>,", self.name.as_snake_case())
+        }
+    }
+}
+
+empty!(::config::General, ArgParseErrorDecl);
+
+impl VisitWrite<visitor::ArgParseErrorDecl> for ::config::Param {
+    fn visit_write<W: fmt::Write>(&self, mut output: W) -> fmt::Result {
+        if self.argument {
+            writeln!(output, "    Field{}(<{} as ::configure_me::parse_arg::ParseArg>::Error),", self.name.as_pascal_case(), self.ty)
+        } else {
+            Ok(())
+        }
+    }
+}
+
+empty!(::config::Switch, ArgParseErrorDecl);
+
+empty!(::config::General, EnvParseErrorDecl);
+
+impl VisitWrite<visitor::EnvParseErrorDecl> for ::config::Param {
+    fn visit_write<W: fmt::Write>(&self, mut output: W) -> fmt::Result {
+        if self.env_var {
+            writeln!(output, "    Field{}(<{} as ::configure_me::parse_arg::ParseArg>::Error),", self.name.as_pascal_case(), self.ty)
+        } else {
+            Ok(())
+        }
+    }
+}
+
+impl VisitWrite<visitor::EnvParseErrorDecl> for ::config::Switch {
+    fn visit_write<W: fmt::Write>(&self, mut output: W) -> fmt::Result {
+        if self.env_var {
+            if self.is_count() {
+                writeln!(output, "    Field{}(<u32 as ::configure_me::parse_arg::ParseArg>::Error),", self.name.as_pascal_case())
+            } else {
+                writeln!(output, "    Field{}(::std::ffi::OsString),", self.name.as_pascal_case())
+            }
+        } else {
+            Ok(())
+        }
+    }
+}
+
+impl VisitWrite<visitor::ConfigFinal> for ::config::Param {
+    fn visit_write<W: fmt::Write>(&self, mut output: W) -> fmt::Result {
+        match self.optionality {
+            Optionality::Optional => writeln!(output, "    pub {}: Option<{}>,", self.name.as_snake_case(), self.convert_into),
+            _ => writeln!(output, "    pub {}: {},", self.name.as_snake_case(), self.convert_into),
+        }
+    }
+}
+
+impl VisitWrite<visitor::ConfigFinal> for ::config::Switch {
+    fn visit_write<W: fmt::Write>(&self, mut output: W) -> fmt::Result {
+        if self.is_count() {
+            writeln!(output, "    pub {}: u32,", self.name.as_snake_case())
+        } else {
+            writeln!(output, "    pub {}: bool,", self.name.as_snake_case())
+        }
+    }
+}
+
+impl VisitWrite<visitor::Validate> for ::config::Param {
+    fn visit_write<W: fmt::Write>(&self, mut output: W) -> fmt::Result {
+        match self.optionality {
+            Optionality::Optional => writeln!(output, "            let {} = self.{};", self.name.as_snake_case(), self.name.as_snake_case()),
+            Optionality::Mandatory => writeln!(output, "            let {} = self.{}.ok_or(ValidationError::MissingField(\"{}\"))?;", self.name.as_snake_case(), self.name.as_snake_case(), self.name.as_snake_case()),
+            Optionality::DefaultValue(ref val) => writeln!(output, "            let {} = self.{}.unwrap_or_else(|| {{ {} }});", self.name.as_snake_case(), self.name.as_snake_case(), val),
+        }
+    }
+}
+
+empty!(::config::Switch, Validate);
+
+impl VisitWrite<visitor::ConstructConfig> for ::config::Param {
+    fn visit_write<W: fmt::Write>(&self, mut output: W) -> fmt::Result {
+        if let Optionality::Optional = self.optionality {
+            writeln!(output, "                {}: {}.map(Into::into),", self.name.as_snake_case(), self.name.as_snake_case())
+        } else {
+            writeln!(output, "                {}: {}.into(),", self.name.as_snake_case(), self.name.as_snake_case())
+        }
+    }
+}
+
+impl VisitWrite<visitor::ConstructConfig> for ::config::Switch {
+    fn visit_write<W: fmt::Write>(&self, mut output: W) -> fmt::Result {
+        let default_value = if self.is_inverted() {
+            "true"
+        } else if self.is_count() {
+            "0"
+        } else {
+            "false"
+        };
+        writeln!(output, "                {}: self.{}.unwrap_or({}),", self.name.as_snake_case(), self.name.as_snake_case(), default_value)
+    }
+}
+
+impl VisitWrite<visitor::MergeIn> for ::config::Param {
+    fn visit_write<W: fmt::Write>(&self, mut output: W) -> fmt::Result {
+        writeln!(output, "            if self.{}.is_none() {{", self.name.as_snake_case())?;
+        writeln!(output, "                self.{} = other.{};", self.name.as_snake_case(), self.name.as_snake_case())?;
+        writeln!(output, "            }}")
+    }
+}
+
+impl VisitWrite<visitor::MergeIn> for ::config::Switch {
+    fn visit_write<W: fmt::Write>(&self, mut output: W) -> fmt::Result {
+        writeln!(output, "            if self.{}.is_none() {{", self.name.as_snake_case())?;
+        writeln!(output, "                self.{} = other.{};", self.name.as_snake_case(), self.name.as_snake_case())?;
+        writeln!(output, "            }}")
+    }
+}
+
+impl VisitWrite<visitor::MergeArgs> for ::config::Param {
+    fn visit_write<W: fmt::Write>(&self, mut output: W) -> fmt::Result {
+        if self.argument {
+            writeln!(output, "                }} else if let Some(value) = ::configure_me::parse_arg::match_arg(\"--{}\", &arg, &mut iter) {{", self.name.as_hypenated())?;
+            writeln!(output, "                    let {} = value.map_err(|err| err.map_or(ArgParseError::MissingArgument(\"--{}\"), ArgParseError::Field{}))?;", self.name.as_snake_case(), self.name.as_hypenated(), self.name.as_pascal_case())?;
+            writeln!(output)?;
+            writeln!(output, "                    self.{} = Some({});", self.name.as_snake_case(), self.name.as_snake_case())
+        } else {
+            Ok(())
+        }
+    }
+}
+
+impl VisitWrite<visitor::MergeArgs> for ::config::Switch {
+    fn visit_write<W: fmt::Write>(&self, mut output: W) -> fmt::Result {
+        if self.is_inverted() {
+            writeln!(output, "                }} else if arg == *\"--no-{}\" {{", self.name.as_hypenated())?;
+            writeln!(output, "                    self.{} = Some(false);", self.name.as_snake_case())
+        } else {
+            writeln!(output, "                }} else if arg == *\"--{}\" {{", self.name.as_hypenated())?;
+
+            if self.is_count() {
+                writeln!(output, "                    *(self.{}.get_or_insert(0)) += 1;", self.name.as_snake_case())
+            } else {
+                writeln!(output, "                    self.{} = Some(true);", self.name.as_snake_case())
+            }
+        }
+    }
+}
+
+impl VisitWrite<visitor::MergeArgs> for ::config::General {
+    fn visit_write<W: fmt::Write>(&self, mut output: W) -> fmt::Result {
+        if let Some(conf_file) = &self.conf_file_param {
+            writeln!(output, "                }} else if let Some(value) = ::configure_me::parse_arg::match_arg(\"--{}\", &arg, &mut iter) {{", conf_file.as_hypenated())?;
+            writeln!(output, "                    let file_path: std::path::PathBuf = value.map_err(|err| err.map_or(ArgParseError::MissingArgument(\"--{}\"), |never| match never {{}}))?;", conf_file.as_hypenated())?;
+            writeln!(output, "                    let mut config = Config::load(file_path)?;")?;
+            writeln!(output, "                    std::mem::swap(self, &mut config);")?;
+            writeln!(output, "                    self.merge_in(config);")?;
+        }
+
+        if let Some(conf_dir) = &self.conf_dir_param {
+            writeln!(output, "                }} else if let Some(value) = ::configure_me::parse_arg::match_arg(\"--{}\", &arg, &mut iter) {{", conf_dir.as_hypenated())?;
+            writeln!(output, "                    let dir_path: std::path::PathBuf = value.map_err(|err| err.map_or(ArgParseError::MissingArgument(\"--{}\"), |never| match never {{}}))?;", conf_dir.as_hypenated())?;
+            writeln!(output)?;
+            writeln!(output, "                    let dir = match std::fs::read_dir(&dir_path) {{")?;
+            writeln!(output, "                        Ok(dir) => dir,")?;
+            writeln!(output, "                        Err(err) => return Err(ArgParseError::OpenConfDir(err, dir_path).into()),")?;
+            writeln!(output, "                    }};")?;
+            writeln!(output)?;
+            writeln!(output, "                    for file in dir {{")?;
+            writeln!(output, "                        let file = match file {{")?;
+            writeln!(output, "                            Ok(file) => file,")?;
+            writeln!(output, "                            Err(err) => return Err(ArgParseError::ReadConfDir(err, dir_path).into()),")?;
+            writeln!(output, "                        }};")?;
+            writeln!(output)?;
+            writeln!(output, "                        let mut config = Config::load(file.path())?;")?;
+            writeln!(output, "                        std::mem::swap(self, &mut config);")?;
+            writeln!(output, "                        self.merge_in(config);")?;
+            writeln!(output, "                    }}")?;
+        }
+        Ok(())
+    }
+}
+
+impl VisitWrite<visitor::MergeShort> for ::config::Param {
+    fn visit_write<W: fmt::Write>(&self, mut output: W) -> fmt::Result {
+        // TODO remove invalid case (false, Some(_))
+        if let (true, Some(short) )= (self.argument, self.abbr) {
+            writeln!(output, "                        }} else if short == '{}' {{", short)?;
+            writeln!(output, "                            self.{} = Some(shorts.parse_remaining(&mut iter).map_err(|err| err.map_or(ArgParseError::MissingArgument(\"-{}\"), ArgParseError::Field{}))?);", &self.name.as_snake_case(), short, self.name.as_pascal_case())?;
+            writeln!(output, "                            break;")
+        } else {
+            Ok(())
+        }
+    }
+}
+
+impl VisitWrite<visitor::MergeShort> for ::config::Switch {
+    fn visit_write<W: fmt::Write>(&self, mut output: W) -> fmt::Result {
+        use ::config::SwitchKind;
+
+        if let SwitchKind::Normal { abbr: Some(abbr), count } = &self.kind {
+            writeln!(output, "                        }} else if short == '{}' {{", abbr)?;
+
+            if *count {
+                writeln!(output, "                            *(self.{}.get_or_insert(0)) += 1;", self.name.as_snake_case())
+            } else {
+                writeln!(output, "                            self.{} = Some(true);", self.name.as_snake_case())
+            }
+        } else {
+            Ok(())
+        }
+    }
+}
+
+empty!(::config::General, MergeShort);
+
 pub(crate) fn param_long_raw(param: &str) -> String {
     let mut res = String::with_capacity(param.len() + 2);
     res.push_str("--");
@@ -12,23 +280,21 @@ pub(crate) fn param_long_raw(param: &str) -> String {
 }
 
 pub(crate) fn param_long(param: &::config::Param) -> String {
-    param_long_raw(&param.name)
+    param_long_raw(&param.name.as_snake_case())
 }
 
 pub(crate) fn switch_long(switch: &::config::Switch) -> String {
-    let mut res = if switch.is_inverted() {
-        let mut res = String::with_capacity(switch.name.len() + 5);
-        res.push_str("--no-");
+    if switch.is_inverted() {
+        let mut res = String::with_capacity(switch.name.as_snake_case().len() + 5);
+                                            // Writing to String never fails
+        write!(res, "--no-{}", switch.name.as_snake_case()).unwrap();
         res
     } else {
-        let mut res = String::with_capacity(switch.name.len() + 2);
-        res.push_str("--");
-        res
-    };
+        let mut res = String::with_capacity(switch.name.as_snake_case().len() + 2);
                                             // Writing to String never fails
-    underscore_to_hypen(&mut res, &switch.name).unwrap();
-
-    res
+        write!(res, "--{}", switch.name.as_snake_case()).unwrap();
+        res
+    }
 }
 
 pub(crate) fn param_short(param: &::config::Param) -> Option<String> {
@@ -50,40 +316,30 @@ pub(crate) fn switch_short(switch: &::config::Switch) -> Option<String> {
     }
 }
 
-fn gen_raw_params<W: Write>(config: &Config, mut output: W) -> fmt::Result {
-    for param in &config.params {
-        writeln!(output, "        {}: Option<{}>,", param.name, param.ty)?;
+fn upper_case<W: Write>(mut output: W, string: &str) -> fmt::Result {
+    for ch in string.chars().flat_map(char::to_uppercase) {
+        write!(output, "{}", ch)?;
     }
     Ok(())
 }
 
-fn gen_raw_switches<W: Write>(config: &Config, mut output: W) -> fmt::Result {
-    for switch in &config.switches {
-        if switch.is_count() {
-            writeln!(output, "        {}: Option<u32>,", switch.name)?;
-        } else {
-            writeln!(output, "        {}: Option<bool>,", switch.name)?;
-        }
-    }
+fn write_params_and_switches<T, W: Write>(config: &Config, mut output: W) -> fmt::Result where ::config::Param: VisitWrite<T>, ::config::Switch: VisitWrite<T> {
+    visitor::iter::<T, _, _>(&config.params, &mut output)?;
+    visitor::iter::<T, _, _>(&config.switches, &mut output)?;
     Ok(())
 }
 
-fn gen_raw_config<W: Write>(config: &Config, mut output: W) -> fmt::Result {
-    gen_raw_params(config, &mut output)?;
-    gen_raw_switches(config, &mut output)?;
-    Ok(())
+fn write_config<T, W: Write>(config: &Config, mut output: W) -> fmt::Result where ::config::Param: VisitWrite<T>, ::config::Switch: VisitWrite<T>, ::config::General: VisitWrite<T> {
+    VisitWrite::<T>::visit_write(&config.general, &mut output)?;
+    write_params_and_switches::<T, _>(config, &mut output)
+}
+
+fn gen_raw_config<W: Write>(config: &Config, output: W) -> fmt::Result {
+    write_params_and_switches::<visitor::RawConfigDecl, _>(config, output)
 }
 
 fn gen_arg_parse_error<W: Write>(config: &Config, mut output: W) -> fmt::Result {
-    for param in &config.params {
-        if !param.argument {
-            continue;
-        }
-
-        write!(output, "    Field")?;
-        pascal_case(&mut output, &param.name)?;
-        writeln!(output, "(<{} as ::configure_me::parse_arg::ParseArg>::Error),", param.ty)?;
-    }
+    write_params_and_switches::<visitor::ArgParseErrorDecl, _>(config, &mut output)?;
     if config.general.conf_dir_param.is_some() {
         writeln!(output, "    OpenConfDir(std::io::Error, std::path::PathBuf),")?;
         writeln!(output, "    ReadConfDir(std::io::Error, std::path::PathBuf),")?;
@@ -91,39 +347,8 @@ fn gen_arg_parse_error<W: Write>(config: &Config, mut output: W) -> fmt::Result 
     Ok(())
 }
 
-fn gen_env_parse_error<W: Write>(config: &Config, mut output: W) -> fmt::Result {
-    for param in &config.params {
-        if !param.env_var {
-            continue;
-        }
-
-        write!(output, "    Field")?;
-        pascal_case(&mut output, &param.name)?;
-        writeln!(output, "(<{} as ::configure_me::parse_arg::ParseArg>::Error),", param.ty)?;
-    }
-    for switch in &config.switches {
-        if !switch.env_var {
-            continue;
-        }
-
-        if switch.is_count() {
-            write!(output, "    Field")?;
-            pascal_case(&mut output, &switch.name)?;
-            writeln!(output, "(<u32 as ::configure_me::parse_arg::ParseArg>::Error),")?;
-        } else {
-            write!(output, "    Field")?;
-            pascal_case(&mut output, &switch.name)?;
-            writeln!(output, "(::std::ffi::OsString),")?;
-        }
-    }
-    Ok(())
-}
-
-fn upper_case<W: Write>(mut output: W, string: &str) -> fmt::Result {
-    for ch in string.chars().flat_map(char::to_uppercase) {
-        write!(output, "{}", ch)?;
-    }
-    Ok(())
+fn gen_env_parse_error<W: Write>(config: &Config, output: W) -> fmt::Result {
+    write_params_and_switches::<visitor::EnvParseErrorDecl, _>(config, output)
 }
 
 fn gen_display_arg_parse_error<W: Write>(config: &Config, mut output: W) -> fmt::Result {
@@ -133,51 +358,42 @@ fn gen_display_arg_parse_error<W: Write>(config: &Config, mut output: W) -> fmt:
         .params
         .iter()
         .filter(|param| param.argument)
-        .map(|param| param.name.len() * 2 + 6)
+        .map(|param| param.name.as_snake_case().len() * 2 + 6)
         .sum::<usize>()
         + config
         .switches
         .iter()
-        .map(|switch| switch.name.len() + if switch.is_inverted() { 8 } else { 5 })
+        .map(|switch| switch.name.as_snake_case().len() + if switch.is_inverted() { 8 } else { 5 })
         .sum::<usize>()
         + config
         .general
         .conf_file_param
         .as_ref()
-        .map(|param| param.len() + 6 + 9)
+        .map(|param| param.as_snake_case().len() + 6 + 9)
         .unwrap_or(0)
         + config
         .general
         .conf_dir_param
         .as_ref()
-        .map(|param| param.len() + 6 + 8)
+        .map(|param| param.as_snake_case().len() + 6 + 8)
         .unwrap_or(0);
 
     write!(output, "        ArgParseError::HelpRequested(program_name) => write!(f, \"Usage: {{}}")?;
     // Standard width of the terminal - "Usage: ".len()
     if sum_arg_len < (80 - 7) {
         if let Some(conf_file_param) = &config.general.conf_file_param {
-            write!(output, " [--")?;
-            underscore_to_hypen(&mut output, &conf_file_param)?;
-            write!(output, " CONF_FILE]")?;
+            write!(output, " [--{} CONF_FILE]", conf_file_param.as_hypenated())?;
         }
         if let Some(conf_dir_param) = &config.general.conf_dir_param {
-            write!(output, " [--")?;
-            underscore_to_hypen(&mut output, &conf_dir_param)?;
-            write!(output, " CONF_DIR]")?;
+            write!(output, " [--{} CONF_DIR]", conf_dir_param.as_hypenated())?;
         }
         for param in config.params.iter().filter(|param| param.argument) {
             if let Some(abbr) = &param.abbr {
-                write!(output, " [-{} ", abbr)?;
-                upper_case(&mut output, &param.name)?;
-                write!(output, "|--")?;
+                write!(output, " [-{} {}|--", abbr, param.name.as_upper_case())?;
             } else {
                 write!(output, " [--")?;
             }
-            underscore_to_hypen(&mut output, &param.name)?;
-            write!(output, " ")?;
-            upper_case(&mut output, &param.name)?;
-            write!(output, "]")?;
+            write!(output, "{} {}]", param.name.as_hypenated(), param.name.as_upper_case())?;
         }
         for switch in config.switches.iter() {
             if let SwitchKind::Normal { abbr: Some(abbr), .. } = &switch.kind {
@@ -188,7 +404,7 @@ fn gen_display_arg_parse_error<W: Write>(config: &Config, mut output: W) -> fmt:
             if switch.is_inverted() {
                 write!(output, "no-")?;
             }
-            underscore_to_hypen(&mut output, &switch.name)?;
+            write!(output, "{}", switch.name.as_hypenated())?;
             if switch.is_count() {
                 write!(output, " ...")?;
             }
@@ -202,14 +418,14 @@ fn gen_display_arg_parse_error<W: Write>(config: &Config, mut output: W) -> fmt:
         .as_ref()
         .into_iter()
         .chain(config.general.conf_dir_param.as_ref())
-        .map(|arg| arg.len());
+        .map(|arg| arg.as_snake_case().len());
 
     let max_param_len = config
         .params
         .iter()
         .filter(|param| param.argument)
         .filter(|param| sum_arg_len > (80 - 7) || param.doc.is_some())
-        .map(|param| param.name.len() + if param.abbr.is_some() { 4 } else { 0 })
+        .map(|param| param.name.as_snake_case().len() + if param.abbr.is_some() { 4 } else { 0 })
         .chain(conf_files)
         .max()
         .unwrap_or(0);
@@ -217,7 +433,7 @@ fn gen_display_arg_parse_error<W: Write>(config: &Config, mut output: W) -> fmt:
         .switches
         .iter()
         .filter(|switch| sum_arg_len > (80 - 7) || switch.doc.is_some())
-        .map(|switch| switch.name.len() + match switch.kind {
+        .map(|switch| switch.name.as_snake_case().len() + match switch.kind {
             SwitchKind::Normal { abbr: Some(_), .. } => 4,
             SwitchKind::Inverted => 3,
             _ => 0,
@@ -254,22 +470,21 @@ fn gen_display_arg_parse_error<W: Write>(config: &Config, mut output: W) -> fmt:
                 if doc.len() > 0 || sum_arg_len > (80 - 7) {
                     let name_len = match switch_kind {
                         SwitchKind::Normal { abbr: Some(abbr), .. } => {
-                            write!(output, "\\n        -{}, --", abbr)?;
-                            name.len() + 4
+                            write!(output, "\\n        -{}, --{}", abbr, name.as_hypenated())?;
+                            name.as_snake_case().len() + 4
                         },
                         SwitchKind::Normal { abbr: None, .. } => {
-                            write!(output, "\\n        --")?;
-                            name.len()
+                            write!(output, "\\n        --{}", name.as_hypenated())?;
+                            name.as_snake_case().len()
                         },
                         SwitchKind::Inverted => {
-                            write!(output, "\\n        --no-")?;
-                            name.len() + 3
+                            write!(output, "\\n        --no-{}", name.as_hypenated())?;
+                            name.as_snake_case().len() + 3
                         },
                     };
 
-                    underscore_to_hypen(&mut output, name)?;
                     for _ in 0..(max_arg_len + 4 - name_len) {
-                        write!(output, " ")?;
+                        output.write_char(' ')?;
                     }
                     let mut pos = doc_start;
                     for word in doc.split_word_bounds() {
@@ -295,8 +510,7 @@ fn gen_display_arg_parse_error<W: Write>(config: &Config, mut output: W) -> fmt:
                         SwitchKind::Inverted => write!(output, "no-")?,
                     }
 
-                    underscore_to_hypen(&mut output, name)?;
-                    write!(output, "\\n")?;
+                    write!(output, "{}\\n", name.as_hypenated())?;
             }
         }
     }
@@ -306,12 +520,8 @@ fn gen_display_arg_parse_error<W: Write>(config: &Config, mut output: W) -> fmt:
             continue;
         }
 
-        write!(output, "        ArgParseError::Field")?;
-        pascal_case(&mut output, &param.name)?;
-        writeln!(output, "(err) => {{")?;
-        write!(output, "            write!(f, \"Failed to parse argument '--")?;
-        underscore_to_hypen(&mut output, &param.name)?;
-        writeln!(output, "': {{}}.\\n\\nHint: the value must be \", err)?;")?;
+        writeln!(output, "        ArgParseError::Field{}(err) => {{", param.name.as_pascal_case())?;
+        writeln!(output, "            write!(f, \"Failed to parse argument '--{}': {{}}.\\n\\nHint: the value must be \", err)?;", param.name.as_hypenated())?;
         writeln!(output, "            <{} as ::configure_me::parse_arg::ParseArg>::describe_type(&mut *f)?;", param.ty)?;
         writeln!(output, "            write!(f, \".\")")?;
         writeln!(output, "        }},")?;
@@ -329,13 +539,10 @@ fn gen_display_env_parse_error<W: Write>(config: &Config, mut output: W) -> fmt:
             continue;
         }
 
-        write!(output, "        EnvParseError::Field")?;
-        pascal_case(&mut output, &param.name)?;
-        writeln!(output, "(ref err) => {{")?;
+        writeln!(output, "        EnvParseError::Field{}(ref err) => {{", param.name.as_pascal_case())?;
         write!(output, "            write!(f, \"Failed to parse environment variable '")?;
         config.general.env_prefix.as_ref().map(|prefix| { upper_case(&mut output, &prefix)?; write!(output, "_") }).unwrap_or(Ok(()))?;
-        upper_case(&mut output, &param.name)?;
-        writeln!(output, "': {{}}.\\n\\nHint: the value must be \", err)?;")?;
+        writeln!(output, "{}': {{}}.\\n\\nHint: the value must be \", err)?;", param.name.as_upper_case())?;
         writeln!(output, "            <{} as ::configure_me::parse_arg::ParseArg>::describe_type(&mut *f)?;", param.ty)?;
         writeln!(output, "            write!(f, \".\")")?;
         writeln!(output, "        }},")?;
@@ -345,119 +552,29 @@ fn gen_display_env_parse_error<W: Write>(config: &Config, mut output: W) -> fmt:
             continue;
         }
 
-        write!(output, "        EnvParseError::Field")?;
-        pascal_case(&mut output, &switch.name)?;
-        writeln!(output, "(ref err) => {{")?;
+        writeln!(output, "        EnvParseError::Field{}(ref err) => {{", switch.name.as_pascal_case())?;
         if switch.is_count() {
             write!(output, "            write!(f, \"Invalid value for '")?;
-            upper_case(&mut output, &switch.name)?;
-            writeln!(output, "': {{}}.\\n\\nHint: the value must be \", err)?;")?;
+            config.general.env_prefix.as_ref().map(|prefix| { upper_case(&mut output, &prefix)?; write!(output, "_") }).unwrap_or(Ok(()))?;
+            writeln!(output, "{}': {{}}.\\n\\nHint: the value must be \", err)?;", switch.name.as_upper_case())?;
             writeln!(output, "            <u32 as ::configure_me::parse_arg::ParseArg>::describe_type(&mut *f)?;")?;
             writeln!(output, "            write!(f, \".\")")?;
         } else {
             write!(output, "            write!(f, \"Invalid value '{{:?}}' for '")?;
             config.general.env_prefix.as_ref().map(|prefix| { upper_case(&mut output, &prefix)?; write!(output, "_") }).unwrap_or(Ok(()))?;
-            upper_case(&mut output, &switch.name)?;
-            writeln!(output, "'.\\n\\nHint: the allowed values are 0, false, 1, true.\", err)")?;
+            writeln!(output, "{}'.\\n\\nHint: the allowed values are 0, false, 1, true.\", err)", switch.name.as_upper_case())?;
         }
         writeln!(output, "        }},")?;
     }
     Ok(())
 }
 
-fn gen_params<W: Write>(config: &Config, mut output: W) -> fmt::Result {
-    for param in &config.params {
-        match param.optionality {
-            Optionality::Optional => writeln!(output, "    pub {}: Option<{}>,", param.name, param.convert_into)?,
-            _ => writeln!(output, "    pub {}: {},", param.name, param.convert_into)?,
-        }
-    }
-    Ok(())
-}
-
-fn gen_switches<W: Write>(config: &Config, mut output: W) -> fmt::Result {
-    for switch in &config.switches {
-        if switch.is_count() {
-            writeln!(output, "    pub {}: u32,", switch.name)?;
-        } else {
-            writeln!(output, "    pub {}: bool,", switch.name)?;
-        }
-    }
-    Ok(())
-}
-
-fn gen_param_validation<W: Write>(config: &Config, mut output: W) -> fmt::Result {
-    for param in &config.params {
-        match param.optionality {
-            Optionality::Optional => writeln!(output, "            let {} = self.{};", param.name, param.name)?,
-            Optionality::Mandatory => writeln!(output, "            let {} = self.{}.ok_or(ValidationError::MissingField(\"{}\"))?;", param.name, param.name, param.name)?,
-            Optionality::DefaultValue(ref val) => writeln!(output, "            let {} = self.{}.unwrap_or_else(|| {{ {} }});", param.name, param.name, val)?,
-        }
-    }
-    Ok(())
-}
-
-fn gen_construct_config_params<W: Write>(config: &Config, mut output: W) -> fmt::Result {
-    for param in &config.params {
-        if let Optionality::Optional = param.optionality {
-            writeln!(output, "                {}: {}.map(Into::into),", param.name, param.name)?;
-        } else {
-            writeln!(output, "                {}: {}.into(),", param.name, param.name)?;
-        }
-    }
-    Ok(())
-}
-
-fn gen_copy_switches<W: Write>(config: &Config, mut output: W) -> fmt::Result {
-    for switch in &config.switches {
-        let default_value = if switch.is_inverted() {
-            "true"
-        } else if switch.is_count() {
-            "0"
-        } else {
-            "false"
-        };
-        writeln!(output, "                {}: self.{}.unwrap_or({}),", switch.name, switch.name, default_value)?;
-    }
-    Ok(())
-}
-
 fn gen_validation_fn<W: Write>(config: &Config, mut output: W) -> fmt::Result {
-    gen_param_validation(config, &mut output)?;
+    write_params_and_switches::<visitor::Validate, _>(config, &mut output)?;
     writeln!(output)?;
     writeln!(output, "            Ok(super::Config {{")?;
-    gen_construct_config_params(config, &mut output)?;
-    gen_copy_switches(config, &mut output)?;
+    write_params_and_switches::<visitor::ConstructConfig, _>(config, &mut output)?;
     writeln!(output, "            }})")?;
-    Ok(())
-}
-
-fn gen_merge_in<W: Write>(config: &Config, mut output: W) -> fmt::Result {
-    for param in &config.params {
-        writeln!(output, "            if self.{}.is_none() {{", param.name)?;
-        writeln!(output, "                self.{} = other.{};", param.name, param.name)?;
-        writeln!(output, "            }}")?;
-    }
-    for switch in &config.switches {
-        writeln!(output, "            if self.{}.is_none() {{", switch.name)?;
-        writeln!(output, "                self.{} = other.{};", switch.name, switch.name)?;
-        writeln!(output, "            }}")?;
-    }
-    Ok(())
-}
-
-fn pascal_case<W: Write>(mut output: W, ident: &str) -> fmt::Result {
-    let mut next_big = true;
-    for c in ident.chars() {
-        match (c, next_big) {
-            ('_', _) => next_big = true,
-            (x, true) => {
-                write!(output, "{}", x.to_ascii_uppercase())?;
-                next_big = false;
-            },
-            (x, false) => write!(output, "{}", x)?,
-        }
-    }
     Ok(())
 }
 
@@ -472,139 +589,6 @@ fn underscore_to_hypen<W: Write>(mut output: W, ident: &str) -> fmt::Result {
     Ok(())
 }
 
-fn gen_arg_parse_params<W: Write>(config: &Config, mut output: W) -> fmt::Result {
-    for param in &config.params {
-        if !param.argument {
-            continue;
-        }
-
-        write!(output, "                }} else if let Some(value) = ::configure_me::parse_arg::match_arg(\"--")?;
-        underscore_to_hypen(&mut output, &param.name)?;
-        writeln!(output, "\", &arg, &mut iter) {{")?;
-        write!(output, "                    let {} = value.map_err(|err| err.map_or(ArgParseError::MissingArgument(\"--", &param.name)?;
-        underscore_to_hypen(&mut output, &param.name)?;
-        write!(output, "\"), ArgParseError::Field")?;
-        pascal_case(&mut output, &param.name)?;
-        writeln!(output, "))?;")?;
-        writeln!(output)?;
-        writeln!(output, "                    self.{} = Some({});", param.name, param.name)?;
-    }
-    Ok(())
-}
-
-fn gen_parse_conf_file_params<W: Write>(config: &Config, mut output: W) -> fmt::Result {
-    if let Some(conf_file) = &config.general.conf_file_param {
-        write!(output, "                }} else if let Some(value) = ::configure_me::parse_arg::match_arg(\"--")?;
-        underscore_to_hypen(&mut output, &conf_file)?;
-        writeln!(output, "\", &arg, &mut iter) {{")?;
-        write!(output, "                    let file_path: std::path::PathBuf = value.map_err(|err| err.map_or(ArgParseError::MissingArgument(\"--")?;
-        underscore_to_hypen(&mut output, &conf_file)?;
-        writeln!(output, "\"), |never| match never {{}}))?;")?;
-        writeln!(output, "                    let mut config = Config::load(file_path)?;")?;
-        writeln!(output, "                    std::mem::swap(self, &mut config);")?;
-        writeln!(output, "                    self.merge_in(config);")?;
-    }
-
-    if let Some(conf_dir) = &config.general.conf_dir_param {
-        write!(output, "                }} else if let Some(value) = ::configure_me::parse_arg::match_arg(\"--")?;
-        underscore_to_hypen(&mut output, &conf_dir)?;
-        writeln!(output, "\", &arg, &mut iter) {{")?;
-        write!(output, "                    let dir_path: std::path::PathBuf = value.map_err(|err| err.map_or(ArgParseError::MissingArgument(\"--")?;
-        underscore_to_hypen(&mut output, &conf_dir)?;
-        writeln!(output, "\"), |never| match never {{}}))?;")?;
-        writeln!(output)?;
-        writeln!(output, "                    let dir = match std::fs::read_dir(&dir_path) {{")?;
-        writeln!(output, "                        Ok(dir) => dir,")?;
-        writeln!(output, "                        Err(err) => return Err(ArgParseError::OpenConfDir(err, dir_path).into()),")?;
-        writeln!(output, "                    }};")?;
-        writeln!(output)?;
-        writeln!(output, "                    for file in dir {{")?;
-        writeln!(output, "                        let file = match file {{")?;
-        writeln!(output, "                            Ok(file) => file,")?;
-        writeln!(output, "                            Err(err) => return Err(ArgParseError::ReadConfDir(err, dir_path).into()),")?;
-        writeln!(output, "                        }};")?;
-        writeln!(output)?;
-        writeln!(output, "                        let mut config = Config::load(file.path())?;")?;
-        writeln!(output, "                        std::mem::swap(self, &mut config);")?;
-        writeln!(output, "                        self.merge_in(config);")?;
-        writeln!(output, "                    }}")?;
-    }
-    Ok(())
-}
-
-fn gen_merge_args<W: Write>(config: &Config, mut output: W) -> fmt::Result {
-    gen_parse_conf_file_params(config, &mut output)?;
-    gen_arg_parse_params(config, &mut output)?;
-    gen_arg_parse_switches(config, &mut output)?;
-    Ok(())
-}
-
-fn gen_arg_parse_switches<W: Write>(config: &Config, mut output: W) -> fmt::Result {
-    for switch in &config.switches {
-        if switch.is_inverted() {
-            write!(output, "                }} else if arg == *\"--no-")?;
-            underscore_to_hypen(&mut output, &switch.name)?;
-            writeln!(output, "\" {{")?;
-            writeln!(output, "                    self.{} = Some(false);", switch.name)?;
-        } else {
-            write!(output, "                }} else if arg == *\"--")?;
-            underscore_to_hypen(&mut output, &switch.name)?;
-            writeln!(output, "\" {{")?;
-
-            if switch.is_count() {
-                writeln!(output, "                    *(self.{}.get_or_insert(0)) += 1;", switch.name)?;
-            } else {
-                writeln!(output, "                    self.{} = Some(true);", switch.name)?;
-            }
-        }
-    }
-    Ok(())
-}
-
-fn gen_arg_parse_short_params<W: Write>(config: &Config, mut output: W) -> fmt::Result {
-    for param in &config.params {
-        if !param.argument {
-            continue;
-        }
-
-        let short = if let Some(short) = param.abbr {
-            short
-        } else {
-            continue;
-        };
-
-        writeln!(output, "                        }} else if short == '{}' {{", short)?;
-        write!(output, "                            self.{} = Some(shorts.parse_remaining(&mut iter).map_err(|err| err.map_or(ArgParseError::MissingArgument(\"-{}\"), ArgParseError::Field", &param.name, short)?;
-        pascal_case(&mut output, &param.name)?;
-        writeln!(output, "))?);")?;
-        writeln!(output, "                            break;")?;
-    }
-    Ok(())
-}
-
-fn gen_arg_parse_short_switches<W: Write>(config: &Config, mut output: W) -> fmt::Result {
-    use ::config::SwitchKind;
-
-    for switch in &config.switches {
-        if let SwitchKind::Normal { abbr: Some(abbr), count } = &switch.kind {
-            writeln!(output, "                        }} else if short == '{}' {{", abbr)?;
-
-            if *count {
-                writeln!(output, "                            *(self.{}.get_or_insert(0)) += 1;", switch.name)?;
-            } else {
-                writeln!(output, "                            self.{} = Some(true);", switch.name)?;
-            }
-        }
-    }
-    Ok(())
-}
-
-fn gen_merge_short_args<W: Write>(config: &Config, mut output: W) -> fmt::Result {
-    gen_arg_parse_short_params(config, &mut output)?;
-    gen_arg_parse_short_switches(config, &mut output)?;
-    Ok(())
-}
-
 fn gen_merge_env<W: Write>(config: &Config, mut output: W) -> fmt::Result {
     for param in &config.params {
         if !param.env_var {
@@ -612,12 +596,9 @@ fn gen_merge_env<W: Write>(config: &Config, mut output: W) -> fmt::Result {
         }
         write!(output, "        if let Some(val) = ::std::env::var_os(\"")?;
         config.general.env_prefix.as_ref().map(|prefix| { upper_case(&mut output, &prefix)?; write!(output, "_") }).unwrap_or(Ok(()))?;
-        upper_case(&mut output, &param.name)?;
-        writeln!(output, "\") {{")?;
-        write!(output, "            let val = ::configure_me::parse_arg::ParseArg::parse_owned_arg(val).map_err(super::EnvParseError::Field")?;
-        pascal_case(&mut output, &param.name)?;
-        writeln!(output, ")?;")?;
-        writeln!(output, "            self.{} = Some(val);", param.name)?;
+        writeln!(output, "{}\") {{", param.name.as_upper_case())?;
+        writeln!(output, "            let val = ::configure_me::parse_arg::ParseArg::parse_owned_arg(val).map_err(super::EnvParseError::Field{})?;", param.name.as_pascal_case())?;
+        writeln!(output, "            self.{} = Some(val);", param.name.as_snake_case())?;
         writeln!(output, "        }}")?;
     }
     for switch in &config.switches {
@@ -626,27 +607,27 @@ fn gen_merge_env<W: Write>(config: &Config, mut output: W) -> fmt::Result {
         }
         write!(output, "        if let Some(val) = ::std::env::var_os(\"")?;
         config.general.env_prefix.as_ref().map(|prefix| { upper_case(&mut output, &prefix)?; write!(output, "_") }).unwrap_or(Ok(()))?;
-        upper_case(&mut output, &switch.name)?;
-        writeln!(output, "\") {{")?;
+        writeln!(output, "{}\") {{", switch.name.as_upper_case())?;
         if switch.is_count() {
-            write!(output, "            let val= <u32 as ::configure_me::parse_arg::ParseArg>::parse_owned_arg(val).map_err(super::EnvParseError::Field")?;
-            pascal_case(&mut output, &switch.name)?;
-            writeln!(output, ")?;")?;
-            writeln!(output, "            self.{} = Some(val);", switch.name)?;
+            write!(output, "            let val= <u32 as ::configure_me::parse_arg::ParseArg>::parse_owned_arg(val).map_err(super::EnvParseError::Field{})?;", switch.name.as_pascal_case())?;
+            writeln!(output, "            self.{} = Some(val);", switch.name.as_snake_case())?;
         } else {
             writeln!(output, "            if val == *\"1\" || val == *\"true\" {{")?;
-            writeln!(output, "                self.{} = Some(true);", switch.name)?;
+            writeln!(output, "                self.{} = Some(true);", switch.name.as_snake_case())?;
             writeln!(output, "            }} else if val == *\"0\" || val == *\"false\" {{")?;
-            writeln!(output, "                self.{} = Some(false);", switch.name)?;
+            writeln!(output, "                self.{} = Some(false);", switch.name.as_snake_case())?;
             writeln!(output, "            }} else {{")?;
-            write!(output, "                return Err(super::EnvParseError::Field")?;
-            pascal_case(&mut output, &switch.name)?;
-            writeln!(output, "(val).into());")?;
+            writeln!(output, "                return Err(super::EnvParseError::Field{}(val).into());", switch.name.as_pascal_case())?;
             writeln!(output, "            }}")?;
         }
         writeln!(output, "        }}")?;
     }
     Ok(())
+}
+
+#[cfg(test)]
+fn gen_merge_args<W: Write>(config: &Config, mut output: W) -> fmt::Result {
+    write_config::<visitor::MergeArgs, _>(config, &mut output)
 }
 
 pub fn generate_code<W: Write>(config: &Config, mut output: W) -> fmt::Result {
@@ -784,7 +765,7 @@ pub fn generate_code<W: Write>(config: &Config, mut output: W) -> fmt::Result {
     writeln!(output, "        }}")?;
     writeln!(output)?;
     writeln!(output, "        pub fn merge_in(&mut self, other: Self) {{")?;
-    gen_merge_in(config, &mut output)?;
+    write_params_and_switches::<visitor::MergeIn, _>(config, &mut output)?;
     writeln!(output, "        }}")?;
     writeln!(output)?;
     writeln!(output, "        pub fn merge_args<I: IntoIterator<Item=::std::ffi::OsString>>(&mut self, args: I) -> Result<impl Iterator<Item=::std::ffi::OsString>, super::Error> {{")?;
@@ -796,12 +777,12 @@ pub fn generate_code<W: Write>(config: &Config, mut output: W) -> fmt::Result {
     writeln!(output, "                    return Ok(None.into_iter().chain(iter));")?;
     writeln!(output, "                }} else if (arg == *\"--help\") || (arg == *\"-h\") {{")?;
     writeln!(output, "                    return Err(ArgParseError::HelpRequested(self._program_path.as_ref().unwrap().to_string_lossy().into()).into());")?;
-    gen_merge_args(config, &mut output)?;
+    write_config::<visitor::MergeArgs, _>(config, &mut output)?;
     writeln!(output, "                }} else if let Some(mut shorts) = ::configure_me::parse_arg::iter_short(&arg) {{")?;
     writeln!(output, "                    for short in &mut shorts {{")?;
     writeln!(output, "                        if short == 'h' {{")?;
     writeln!(output, "                            return Err(ArgParseError::HelpRequested(self._program_path.as_ref().unwrap().to_string_lossy().into()).into())")?;
-    gen_merge_short_args(config, &mut output)?;
+    write_config::<visitor::MergeShort, _>(config, &mut output)?;
     writeln!(output, "                        }} else {{")?;
     writeln!(output, "                            let mut arg = String::with_capacity(2);")?;
     writeln!(output, "                            arg.push('-');")?;
@@ -828,8 +809,7 @@ pub fn generate_code<W: Write>(config: &Config, mut output: W) -> fmt::Result {
     writeln!(output)?;
     writeln!(output, "/// Configuration of the application")?;
     writeln!(output, "pub struct Config {{")?;
-    gen_params(config, &mut output)?;
-    gen_switches(config, &mut output)?;
+    write_params_and_switches::<visitor::ConfigFinal, _>(config, &mut output)?;
     writeln!(output, "}}")?;
     writeln!(output)?;
     writeln!(output, "impl Config {{")?;

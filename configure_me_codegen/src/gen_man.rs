@@ -38,7 +38,7 @@ fn generate_meta(config: &Config) -> Manual {
 
 fn generate_conf_file_param(man: Manual, config: &Config) -> Manual {
     if let Some(conf_file_param) = &config.general.conf_file_param {
-        let opt = Opt::new("CONFIG_FILE").long(&::codegen::param_long_raw(conf_file_param));
+        let opt = Opt::new("CONFIG_FILE").long(&::codegen::param_long_raw(conf_file_param.as_snake_case()));
         let opt = opt.help("Loads configuration from the specified CONFIG_FILE.");
         man.option(opt)
     } else {
@@ -48,7 +48,7 @@ fn generate_conf_file_param(man: Manual, config: &Config) -> Manual {
 
 fn generate_conf_dir_param(man: Manual, config: &Config) -> Manual {
     if let Some(conf_dir_param) = &config.general.conf_dir_param {
-        let opt = Opt::new("CONFIG_DIR").long(&::codegen::param_long_raw(conf_dir_param));
+        let opt = Opt::new("CONFIG_DIR").long(&::codegen::param_long_raw(conf_dir_param.as_snake_case()));
         let opt = opt.help("Loads configuration from all files in the directory CONFIG_DIR.");
         man.option(opt)
     } else {
@@ -61,7 +61,7 @@ fn generate_params(man: Manual, config: &Config) -> Manual {
         .params
         .iter()
         .filter(|param| param.argument).map(|param| {
-            let opt = Opt::new(&param.name.to_uppercase()).long(&::codegen::param_long(param));
+            let opt = Opt::new(&param.name.as_upper_case().to_string()).long(&::codegen::param_long(param));
             let opt = if let Some(short) = ::codegen::param_short(param) {
                 opt.short(&short)
             } else {
@@ -110,7 +110,7 @@ fn generate_param_env_vars(man: Manual, config: &Config) -> Manual {
         .params
         .iter()
         .filter(|param| param.env_var).map(|param| {
-            let env = Env::new(&[&prefix as &str, &param.name.to_uppercase()].join(""));
+            let env = Env::new(&[&prefix as &str, &param.name.as_upper_case().to_string()].join(""));
             let env = if let Some(doc) = &param.doc {
                 env.help(&doc)
             } else {
@@ -132,7 +132,7 @@ fn generate_switch_env_vars(man: Manual, config: &Config) -> Manual {
         .switches
         .iter()
         .filter(|switch| switch.env_var).map(|switch| {
-            let env = Env::new(&[&prefix as &str, &switch.name.to_uppercase()].join(""));
+            let env = Env::new(&[&prefix as &str, &switch.name.as_upper_case().to_string()].join(""));
             let env = if let Some(doc) = &switch.doc {
                 env.help(&doc)
             } else {

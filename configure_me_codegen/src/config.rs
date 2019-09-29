@@ -29,20 +29,123 @@ impl fmt::Display for ValidationError {
     }
 }
 
+mod ident {
+    use std::convert::TryFrom;
+    use std::fmt::{self, Write};
+
+    pub struct Error {
+        string: String,
+        position: usize,
+    }
+
+    impl fmt::Display for Error {
+        fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+            write!(f, "\"{}\" is not a valid identifier, invalid char at position {}", self.string, self.position)
+        }
+    }
+
+    #[derive(Debug, Deserialize)]
+    #[serde(try_from = "String")]
+    pub struct Ident(String);
+
+    impl TryFrom<String> for Ident {
+        type Error = Error;
+
+        fn try_from(string: String) -> Result<Ident, Error> {
+            for (i, c) in string.chars().enumerate() {
+                if c != '_' && ! ((c >= 'a' && c <= 'z') || (c >= '0' && c <= '9' && i > 0)) {
+                    return Err(Error {
+                        string,
+                        position: i,
+                    });
+                }
+            }
+
+            Ok(Ident(string))
+        }
+    }
+
+    impl Ident {
+        pub(crate) fn as_snake_case(&self) -> &str {
+            &self.0
+        }
+
+        pub(crate) fn as_upper_case(&self) -> UpperCase<'_> {
+            UpperCase(&self.0)
+        }
+
+        pub(crate) fn as_hypenated(&self) -> Hypenated<'_> {
+            Hypenated(&self.0)
+        }
+
+        pub(crate) fn as_pascal_case(&self) -> PascalCase<'_> {
+            PascalCase(&self.0)
+        }
+    }
+
+    pub(crate) struct UpperCase<'a>(&'a str);
+
+    impl<'a> fmt::Display for UpperCase<'a> {
+        fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+            for ch in self.0.chars() {
+                f.write_char(ch.to_ascii_uppercase())?;
+            }
+            Ok(())
+        }
+    }
+
+    pub(crate) struct Hypenated<'a>(&'a str);
+
+    impl<'a> fmt::Display for Hypenated<'a> {
+        fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+            for ch in self.0.chars() {
+                if ch == '_' {
+                    f.write_char('-')
+                } else {
+                    f.write_char(ch)
+                }?;
+            }
+            Ok(())
+        }
+    }
+
+    pub(crate) struct PascalCase<'a>(&'a str);
+
+    impl<'a> fmt::Display for PascalCase<'a> {
+        fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+            let mut next_big = true;
+            for ch in self.0.chars() {
+                match (ch, next_big) {
+                    ('_', _) => next_big = true,
+                    (x, true) => {
+                        f.write_char(x.to_ascii_uppercase())?;
+                        next_big = false;
+                    },
+                    (x, false) => f.write_char(x)?,
+                }
+            }
+            Ok(())
+        }
+    }
+}
+
+use self::ident::Ident;
+
 pub mod raw {
     use super::{ValidationError, ValidationErrorKind, Optionality, SwitchKind};
+    use super::ident::Ident;
 
     trait ResultExt {
         type Item;
 
-        fn field_name(self, name: &str) -> Result<Self::Item, ValidationError>;
+        fn field_name(self, name: &Ident) -> Result<Self::Item, ValidationError>;
     }
 
     impl<T> ResultExt for Result<T, ValidationErrorKind> {
         type Item = T;
 
-        fn field_name(self, name: &str) -> Result<Self::Item, ValidationError> {
-            self.map_err(|kind| ValidationError { name: name.to_owned(), kind })
+        fn field_name(self, name: &Ident) -> Result<Self::Item, ValidationError> {
+            self.map_err(|kind| ValidationError { name: name.as_snake_case().to_owned(), kind })
         }
     }
 
@@ -90,7 +193,7 @@ pub mod raw {
     #[derive(Deserialize)]
     #[serde(deny_unknown_fields)]
     pub struct Param {
-        name: String,
+        name: Ident,
         abbr: Option<char>,
         #[serde(rename = "type")]
         ty: String,
@@ -140,7 +243,7 @@ pub mod raw {
     #[derive(Deserialize)]
     #[serde(deny_unknown_fields)]
     pub struct Switch {
-        name: String,
+        name: Ident,
         abbr: Option<char>,
         #[serde(default)]
         default: bool,
@@ -220,14 +323,14 @@ pub struct General {
     /// immediately load a config file, parse
     /// it, and override all configuration
     /// provided so far with that file.
-    pub conf_file_param: Option<String>,
+    pub conf_file_param: Option<Ident>,
 
     /// The name of the parameter which, if
     /// specified causes parameter parsing to
     /// immediately load all files from the
     /// directory, parse them, and override all
     /// configuration provided so far with them.
-    pub conf_dir_param: Option<String>,
+    pub conf_dir_param: Option<Ident>,
 }
 
 #[derive(Debug)]
@@ -265,7 +368,7 @@ pub enum SwitchKind {
 }
 
 pub struct Param {
-    pub name: String,
+    pub name: Ident,
     pub abbr: Option<char>,
     pub ty: String,
     pub optionality: Optionality,
@@ -276,7 +379,7 @@ pub struct Param {
 }
 
 pub struct Switch {
-    pub name: String,
+    pub name: Ident,
     pub kind: SwitchKind,
     pub doc: Option<String>,
     pub env_var: bool,
