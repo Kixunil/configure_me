@@ -342,7 +342,7 @@ impl VisitWrite<visitor::Postinst> for ::config::Param {
             writeln!(output, "db_get {}/{}", config.package_name, self.name.as_snake_case())?;
             match self.ty.as_str() {
                 "bool" | "u8" | "u16" | "u32" | "u64" | "u128" |
-                    "i8" | "i16" | "i32" | "i64" | "i128" => writeln!(output, "echo {}=\"$RET\" >> \"$CONF_FILE\"", self.name.as_snake_case()),
+                    "i8" | "i16" | "i32" | "i64" | "i128" | "f32" | "f64" => writeln!(output, "echo {}=\"$RET\" >> \"$CONF_FILE\"", self.name.as_snake_case()),
                 _ => writeln!(output, "echo \"$RET\" | sed -e 's/\"/\\\"/g' -e 's/^/{}=\"/' -e 's/$/\"/' >> \"$CONF_FILE\"", self.name.as_snake_case()),
             }
         } else {
