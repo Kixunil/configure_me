@@ -1,0 +1,45 @@
+macro_rules! test_name { () => { "single_optional_param" } }
+
+include!("glue/boilerplate.rs");
+
+#[test]
+fn config_ordering() {
+    use std::path::PathBuf;
+
+    let mut this = PathBuf::from(std::env::args_os().next().expect("Program name not specified"));
+
+    while let Some(file_name) = this.file_name() {
+        if *file_name == *"target" {
+            break;
+        }
+
+        this.pop();
+    }
+
+    if !this.pop() {
+        panic!("Can't find test assets");
+    }
+
+    this.push("configure_me_codegen");
+    if !this.exists() {
+        this.pop();
+    }
+    this.push("tests");
+    this.push("config_files");
+    let empty = this.join("empty.toml");
+    let fortytwo = this.join("fortytwo.toml");
+    let fortyseven = this.join("fortyseven.toml");
+
+    let (config, _) = config::Config::including_optional_config_files(&[&empty, &empty]).unwrap();
+    assert!(config.foo.is_none());
+    let (config, _) = config::Config::including_optional_config_files(&[&empty, &fortytwo]).unwrap();
+    assert_eq!(config.foo, Some(42));
+    let (config, _) = config::Config::including_optional_config_files(&[&fortytwo, &empty]).unwrap();
+    assert_eq!(config.foo, Some(42));
+    let (config, _) = config::Config::including_optional_config_files(&[&fortytwo, &fortytwo]).unwrap();
+    assert_eq!(config.foo, Some(42));
+    let (config, _) = config::Config::including_optional_config_files(&[&fortytwo, &fortyseven]).unwrap();
+    assert_eq!(config.foo, Some(42));
+    let (config, _) = config::Config::including_optional_config_files(&[&fortyseven, &fortytwo]).unwrap();
+    assert_eq!(config.foo, Some(47));
+}
