@@ -69,7 +69,7 @@ build = "build.rs"
 configure_me = "0.3.3"
 
 [build-dependencies]
-configure_me_codegen = "0.3.8"
+configure_me_codegen = "0.3.9"
 ```
 
 And finally add appropriate incantiations into `src/main.rs`:
@@ -88,6 +88,56 @@ fn main() {
     let listener = std::net::TcpListener::bind((server_config.bind_addr, server_config.port)).expect("Failed to bind socket");
 }
 ```
+
+Debconf generation
+------------------
+
+This crate also contains experimental debconf support behind `debconf` feature. It generates `templates`, `configure` and `postinst` files for you. If you plan to package your application, you can use it. Note that this isn't integrated with `cargo-deb` yet.
+
+In order to use this feature, you must enable the flag in `Cargo.toml`:
+
+```toml
+configure_me_codegen = { version = "0.3.9", features = ["debconf"] }
+```
+
+Then add debconf options to your configuration specification:
+
+```toml
+[debconf]
+# Sets the name of the package
+# Enables debconf support
+package_name = "my-awesome-app"
+
+[[param]]
+name = "port"
+type = "u16"
+optional = false
+# Documentation IS mandatory for debconf!
+doc = "Port to listen on."
+# Priority used for debconf questions
+# "high" is recommended for non-default, mandatory questions
+# In case of missing priority, the option is skipped!
+debconf_priority = "high"
+
+[[param]]
+name = "bind_addr"
+type = "::std::net::Ipv4Addr"
+default = "::std::net::Ipv4Addr::new(0, 0, 0, 0)" # Rust expression that creates the value
+doc = "IP address to bind to."
+debconf_priority = "low"
+# The default set by debconf. While it might seem redundant, this way the user sees the
+# default value when editing.
+debconf_default = "0.0.0.0"
+
+[[param]]
+name = "tls_cert"
+type = "String"
+doc = "Path to the TLS certificate. The connections will be unsecure if it isn't provided."
+debconf_priority = "medium"
+```
+
+Finally build your application with `DEBCONF_OUT` environment variable set to existing directory
+where `configure_me` should generte the files.
 
 Planned features
 ----------------
