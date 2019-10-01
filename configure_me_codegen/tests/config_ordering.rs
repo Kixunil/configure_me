@@ -29,6 +29,7 @@ fn config_ordering() {
     let empty = this.join("empty.toml");
     let fortytwo = this.join("fortytwo.toml");
     let fortyseven = this.join("fortyseven.toml");
+    let empty_args: &[&str] = &[];
 
     let (config, _) = config::Config::including_optional_config_files(&[&empty, &empty]).unwrap();
     assert!(config.foo.is_none());
@@ -42,4 +43,9 @@ fn config_ordering() {
     assert_eq!(config.foo, Some(42));
     let (config, _) = config::Config::including_optional_config_files(&[&fortyseven, &fortytwo]).unwrap();
     assert_eq!(config.foo, Some(47));
+
+    let (config, _) = config::Config::custom_args_and_optional_files(&["test", "--foo=42"], empty_args).unwrap();
+    assert_eq!(config.foo, Some(42));
+    let (config, _) = config::Config::custom_args_and_optional_files(&["test", "--foo=42"], &[&fortyseven]).unwrap();
+    assert_eq!(config.foo, Some(42));
 }
