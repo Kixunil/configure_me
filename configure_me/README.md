@@ -69,7 +69,7 @@ build = "build.rs"
 configure_me = "0.3.3"
 
 [build-dependencies]
-configure_me_codegen = "0.3.9"
+configure_me_codegen = "0.3.10"
 ```
 
 And finally add appropriate incantiations into `src/main.rs`:
@@ -97,7 +97,7 @@ This crate also contains experimental debconf support behind `debconf` feature. 
 In order to use this feature, you must enable the flag in `Cargo.toml`:
 
 ```toml
-configure_me_codegen = { version = "0.3.9", features = ["debconf"] }
+configure_me_codegen = { version = "0.3.10", features = ["debconf"] }
 ```
 
 Then add debconf options to your configuration specification:
