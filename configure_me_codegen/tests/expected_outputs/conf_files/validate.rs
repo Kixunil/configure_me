@@ -1,5 +1,5 @@
-            let foo = self.foo.unwrap_or_else(|| { 42 });
+            let foo = self.foo;
 
             Ok(super::Config {
-                foo: foo.into(),
+                foo: foo.map(Into::into),
             })

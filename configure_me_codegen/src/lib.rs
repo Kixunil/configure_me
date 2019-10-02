@@ -326,7 +326,6 @@ conf_dir_param = "conf_dir"
 [[param]]
 name = "foo"
 type = "u32"
-default = "42"
 doc = "A foo"
 "#;
 

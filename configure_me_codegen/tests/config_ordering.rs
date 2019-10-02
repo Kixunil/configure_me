@@ -1,4 +1,4 @@
-macro_rules! test_name { () => { "single_optional_param" } }
+macro_rules! test_name { () => { "conf_files" } }
 
 include!("glue/boilerplate.rs");
 
@@ -47,5 +47,7 @@ fn config_ordering() {
     let (config, _) = config::Config::custom_args_and_optional_files(&["test", "--foo=42"], empty_args).unwrap();
     assert_eq!(config.foo, Some(42));
     let (config, _) = config::Config::custom_args_and_optional_files(&["test", "--foo=42"], &[&fortyseven]).unwrap();
+    assert_eq!(config.foo, Some(42));
+    let (config, _) = config::Config::custom_args_and_optional_files(&["test".as_ref(), "--foo=50".as_ref(), "--config".as_ref(), fortytwo.as_path()], &[&fortyseven]).unwrap();
     assert_eq!(config.foo, Some(42));
 }

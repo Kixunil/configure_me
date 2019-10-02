@@ -1,1 +1,1 @@
-    pub foo: u32,
+    pub foo: Option<u32>,
