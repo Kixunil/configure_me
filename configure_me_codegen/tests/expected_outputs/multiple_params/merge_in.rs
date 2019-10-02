@@ -1,15 +1,15 @@
-            if self.foo.is_none() {
+            if other.foo.is_some() {
                 self.foo = other.foo;
             }
-            if self.bar.is_none() {
+            if other.bar.is_some() {
                 self.bar = other.bar;
             }
-            if self.baz.is_none() {
+            if other.baz.is_some() {
                 self.baz = other.baz;
             }
-            if self.verbose.is_none() {
+            if other.verbose.is_some() {
                 self.verbose = other.verbose;
             }
-            if self.fast.is_none() {
+            if other.fast.is_some() {
                 self.fast = other.fast;
             }

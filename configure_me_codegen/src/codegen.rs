@@ -159,7 +159,7 @@ impl VisitWrite<visitor::ConstructConfig> for ::config::Switch {
 
 impl VisitWrite<visitor::MergeIn> for ::config::Param {
     fn visit_write<W: fmt::Write>(&self, mut output: W) -> fmt::Result {
-        writeln!(output, "            if self.{}.is_none() {{", self.name.as_snake_case())?;
+        writeln!(output, "            if other.{}.is_some() {{", self.name.as_snake_case())?;
         writeln!(output, "                self.{} = other.{};", self.name.as_snake_case(), self.name.as_snake_case())?;
         writeln!(output, "            }}")
     }
@@ -167,7 +167,7 @@ impl VisitWrite<visitor::MergeIn> for ::config::Param {
 
 impl VisitWrite<visitor::MergeIn> for ::config::Switch {
     fn visit_write<W: fmt::Write>(&self, mut output: W) -> fmt::Result {
-        writeln!(output, "            if self.{}.is_none() {{", self.name.as_snake_case())?;
+        writeln!(output, "            if other.{}.is_some() {{", self.name.as_snake_case())?;
         writeln!(output, "                self.{} = other.{};", self.name.as_snake_case(), self.name.as_snake_case())?;
         writeln!(output, "            }}")
     }
@@ -209,7 +209,6 @@ impl VisitWrite<visitor::MergeArgs> for ::config::General {
             writeln!(output, "                }} else if let Some(value) = ::configure_me::parse_arg::match_arg(\"--{}\", &arg, &mut iter) {{", conf_file.as_hypenated())?;
             writeln!(output, "                    let file_path: std::path::PathBuf = value.map_err(|err| err.map_or(ArgParseError::MissingArgument(\"--{}\"), |never| match never {{}}))?;", conf_file.as_hypenated())?;
             writeln!(output, "                    let mut config = Config::load(file_path)?;")?;
-            writeln!(output, "                    std::mem::swap(self, &mut config);")?;
             writeln!(output, "                    self.merge_in(config);")?;
         }
 
@@ -229,7 +228,6 @@ impl VisitWrite<visitor::MergeArgs> for ::config::General {
             writeln!(output, "                        }};")?;
             writeln!(output)?;
             writeln!(output, "                        let mut config = Config::load(file.path())?;")?;
-            writeln!(output, "                        std::mem::swap(self, &mut config);")?;
             writeln!(output, "                        self.merge_in(config);")?;
             writeln!(output, "                    }}")?;
         }
@@ -821,22 +819,22 @@ pub fn generate_code<W: Write>(config: &Config, mut output: W) -> fmt::Result {
     writeln!(output, "        A: IntoIterator, A::Item: Into<::std::ffi::OsString>,")?;
     writeln!(output, "        I: IntoIterator, I::Item: AsRef<::std::path::Path> {{")?;
     writeln!(output)?;
-    writeln!(output, "        let mut arg_cfg = raw::Config::default();")?;
-    writeln!(output, "        let remaining_args = arg_cfg.merge_args(args.into_iter().map(Into::into))?;")?;
-    writeln!(output)?;
     writeln!(output, "        let mut config = raw::Config::default();")?;
     writeln!(output, "        for path in config_files {{")?;
     writeln!(output, "            match raw::Config::load(path) {{")?;
-    writeln!(output, "                Ok(new_config) => config.merge_in(new_config),")?;
+    writeln!(output, "                Ok(mut new_config) => {{")?;
+    writeln!(output, "                    std::mem::swap(&mut config, &mut new_config);")?;
+    writeln!(output, "                    config.merge_in(new_config)")?;
+    writeln!(output, "                }},")?;
     writeln!(output, "                Err(Error::Reading {{ ref error, .. }}) if error.kind() == ::std::io::ErrorKind::NotFound => (),")?;
     writeln!(output, "                Err(err) => return Err(err),")?;
     writeln!(output, "            }}")?;
     writeln!(output, "        }}")?;
     writeln!(output)?;
     writeln!(output, "        config.merge_env()?;")?;
-    writeln!(output, "        arg_cfg.merge_in(config);")?;
+    writeln!(output, "        let remaining_args = config.merge_args(args.into_iter().map(Into::into))?;")?;
     writeln!(output)?;
-    writeln!(output, "        arg_cfg")?;
+    writeln!(output, "        config")?;
     writeln!(output, "            .validate()")?;
     writeln!(output, "            .map(|cfg| (cfg, remaining_args))")?;
     writeln!(output, "            .map_err(Into::into)")?;

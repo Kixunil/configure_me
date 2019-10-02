@@ -1,18 +1,18 @@
-            if self.d.is_none() {
+            if other.d.is_some() {
                 self.d = other.d;
             }
-            if self.e.is_none() {
+            if other.e.is_some() {
                 self.e = other.e;
             }
-            if self.a.is_none() {
+            if other.a.is_some() {
                 self.a = other.a;
             }
-            if self.b.is_none() {
+            if other.b.is_some() {
                 self.b = other.b;
             }
-            if self.c.is_none() {
+            if other.c.is_some() {
                 self.c = other.c;
             }
-            if self.foo_bar.is_none() {
+            if other.foo_bar.is_some() {
                 self.foo_bar = other.foo_bar;
             }

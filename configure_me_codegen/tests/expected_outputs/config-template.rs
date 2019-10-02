@@ -188,22 +188,22 @@ impl Config {
         A: IntoIterator, A::Item: Into<::std::ffi::OsString>,
         I: IntoIterator, I::Item: AsRef<::std::path::Path> {
 
-        let mut arg_cfg = raw::Config::default();
-        let remaining_args = arg_cfg.merge_args(args.into_iter().map(Into::into))?;
-
         let mut config = raw::Config::default();
         for path in config_files {
             match raw::Config::load(path) {
-                Ok(new_config) => config.merge_in(new_config),
+                Ok(mut new_config) => {
+                    std::mem::swap(&mut config, &mut new_config);
+                    config.merge_in(new_config)
+                },
                 Err(Error::Reading { ref error, .. }) if error.kind() == ::std::io::ErrorKind::NotFound => (),
                 Err(err) => return Err(err),
             }
         }
 
         config.merge_env()?;
-        arg_cfg.merge_in(config);
+        let remaining_args = config.merge_args(args.into_iter().map(Into::into))?;
 
-        arg_cfg
+        config
             .validate()
             .map(|cfg| (cfg, remaining_args))
             .map_err(Into::into)
