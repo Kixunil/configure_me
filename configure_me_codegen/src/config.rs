@@ -207,6 +207,7 @@ pub mod raw {
         argument: Option<bool>,
         env_var: Option<bool>,
         convert_into: Option<String>,
+        merge_fn: Option<String>,
         #[cfg(feature = "debconf")]
         debconf_priority: Option<::debconf::Priority>,
         #[cfg(feature = "debconf")]
@@ -243,6 +244,7 @@ pub mod raw {
                 argument,
                 env_var,
                 convert_into,
+                merge_fn: self.merge_fn,
                 #[cfg(feature = "debconf")]
                 debconf_priority: self.debconf_priority,
                 #[cfg(feature = "debconf")]
@@ -394,6 +396,7 @@ pub struct Param {
     pub argument: bool,
     pub env_var: bool,
     pub convert_into: String,
+    pub merge_fn: Option<String>,
     #[cfg(feature = "debconf")]
     pub debconf_priority: Option<::debconf::Priority>,
     #[cfg(feature = "debconf")]

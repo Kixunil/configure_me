@@ -159,9 +159,18 @@ impl VisitWrite<visitor::ConstructConfig> for ::config::Switch {
 
 impl VisitWrite<visitor::MergeIn> for ::config::Param {
     fn visit_write<W: fmt::Write>(&self, mut output: W) -> fmt::Result {
-        writeln!(output, "            if other.{}.is_some() {{", self.name.as_snake_case())?;
-        writeln!(output, "                self.{} = other.{};", self.name.as_snake_case(), self.name.as_snake_case())?;
-        writeln!(output, "            }}")
+        if let Some(merge_fn) = &self.merge_fn {
+            writeln!(output, "            match (&mut self.{}, other.{}) {{", self.name.as_snake_case(), self.name.as_snake_case())?;
+            writeln!(output, "                (None, None) => (),")?;
+            writeln!(output, "                (None, Some(val)) => self.{} = Some(val),", self.name.as_snake_case())?;
+            writeln!(output, "                (Some(_), None) => (),")?;
+            writeln!(output, "                (Some(val0), Some(val1)) => {}(val0, val1),", merge_fn)?;
+            writeln!(output, "            }}")
+        } else {
+            writeln!(output, "            if other.{}.is_some() {{", self.name.as_snake_case())?;
+            writeln!(output, "                self.{} = other.{};", self.name.as_snake_case(), self.name.as_snake_case())?;
+            writeln!(output, "            }}")
+        }
     }
 }
 
@@ -179,7 +188,15 @@ impl VisitWrite<visitor::MergeArgs> for ::config::Param {
             writeln!(output, "                }} else if let Some(value) = ::configure_me::parse_arg::match_arg(\"--{}\", &arg, &mut iter) {{", self.name.as_hypenated())?;
             writeln!(output, "                    let {} = value.map_err(|err| err.map_or(ArgParseError::MissingArgument(\"--{}\"), ArgParseError::Field{}))?;", self.name.as_snake_case(), self.name.as_hypenated(), self.name.as_pascal_case())?;
             writeln!(output)?;
-            writeln!(output, "                    self.{} = Some({});", self.name.as_snake_case(), self.name.as_snake_case())
+            if let Some(merge_fn) = &self.merge_fn {
+                writeln!(output, "                    if let Some({}_old) = &mut self.{} {{", self.name.as_snake_case(), self.name.as_snake_case())?;
+                writeln!(output, "                        {}({}_old, {});", merge_fn, self.name.as_snake_case(), self.name.as_snake_case())?;
+                writeln!(output, "                    }} else {{")?;
+                writeln!(output, "                        self.{} = Some({});", self.name.as_snake_case(), self.name.as_snake_case())?;
+                writeln!(output, "                    }}")
+            } else {
+                writeln!(output, "                    self.{} = Some({});", self.name.as_snake_case(), self.name.as_snake_case())
+            }
         } else {
             Ok(())
         }
@@ -596,7 +613,15 @@ fn gen_merge_env<W: Write>(config: &Config, mut output: W) -> fmt::Result {
         config.general.env_prefix.as_ref().map(|prefix| { upper_case(&mut output, &prefix)?; write!(output, "_") }).unwrap_or(Ok(()))?;
         writeln!(output, "{}\") {{", param.name.as_upper_case())?;
         writeln!(output, "            let val = ::configure_me::parse_arg::ParseArg::parse_owned_arg(val).map_err(super::EnvParseError::Field{})?;", param.name.as_pascal_case())?;
-        writeln!(output, "            self.{} = Some(val);", param.name.as_snake_case())?;
+        if let Some(merge_fn) = &param.merge_fn {
+            writeln!(output, "            if let Some({}_old) = &mut self.{} {{", param.name.as_snake_case(), param.name.as_snake_case())?;
+            writeln!(output, "                {}({}_old, val);", merge_fn, param.name.as_snake_case())?;
+            writeln!(output, "            }} else {{")?;
+            writeln!(output, "                self.{} = Some(val);", param.name.as_snake_case())?;
+            writeln!(output, "            }}")?;
+        } else {
+            writeln!(output, "            self.{} = Some(val);", param.name.as_snake_case())?;
+        }
         writeln!(output, "        }}")?;
     }
     for switch in &config.switches {

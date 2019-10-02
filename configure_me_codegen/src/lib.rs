@@ -329,6 +329,17 @@ type = "u32"
 doc = "A foo"
 "#;
 
+    pub const CUSTOM_MERGE_FN: &str =
+r#"
+[general]
+env_prefix = "TEST_APP"
+
+[[param]]
+name = "foo"
+type = "u32"
+merge_fn = "(|a: &mut u32, b: u32| *a += b)"
+"#;
+
     pub struct ExpectedOutput {
         pub raw_config: &'static str,
         pub validate: &'static str,
@@ -442,5 +453,10 @@ doc = "A foo"
     #[test]
     fn conf_files() {
         check(CONF_FILES, include_str!(concat!(env!("OUT_DIR"), "/expected_outputs/conf_files-config.rs")));
+    }
+
+    #[test]
+    fn custom_merge_fn() {
+        check(CUSTOM_MERGE_FN, include_str!(concat!(env!("OUT_DIR"), "/expected_outputs/with_custom_merge-config.rs")));
     }
 }
