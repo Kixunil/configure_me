@@ -160,11 +160,12 @@ impl VisitWrite<visitor::ConstructConfig> for ::config::Switch {
 impl VisitWrite<visitor::MergeIn> for ::config::Param {
     fn visit_write<W: fmt::Write>(&self, mut output: W) -> fmt::Result {
         if let Some(merge_fn) = &self.merge_fn {
-            writeln!(output, "            match (&mut self.{}, other.{}) {{", self.name.as_snake_case(), self.name.as_snake_case())?;
-            writeln!(output, "                (None, None) => (),")?;
-            writeln!(output, "                (None, Some(val)) => self.{} = Some(val),", self.name.as_snake_case())?;
-            writeln!(output, "                (Some(_), None) => (),")?;
-            writeln!(output, "                (Some(val0), Some(val1)) => {}(val0, val1),", merge_fn)?;
+            writeln!(output, "            if let Some({}) = other.{} {{", self.name.as_snake_case(), self.name.as_snake_case())?;
+            writeln!(output, "                if let Some({}_old) = &mut self.{} {{", self.name.as_snake_case(), self.name.as_snake_case())?;
+            writeln!(output, "                    {}({}_old, {});", merge_fn, self.name.as_snake_case(), self.name.as_snake_case())?;
+            writeln!(output, "                }} else {{")?;
+            writeln!(output, "                    self.{} = Some({});", self.name.as_snake_case(), self.name.as_snake_case())?;
+            writeln!(output, "                }}")?;
             writeln!(output, "            }}")
         } else {
             writeln!(output, "            if other.{}.is_some() {{", self.name.as_snake_case())?;

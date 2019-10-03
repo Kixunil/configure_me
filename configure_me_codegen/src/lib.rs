@@ -338,6 +338,11 @@ env_prefix = "TEST_APP"
 name = "foo"
 type = "u32"
 merge_fn = "(|a: &mut u32, b: u32| *a += b)"
+
+[[param]]
+name = "bar"
+type = "String"
+merge_fn = "(|a: &mut String, b: String| a.push_str(&b))"
 "#;
 
     pub struct ExpectedOutput {

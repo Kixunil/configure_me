@@ -27,6 +27,7 @@ fn custom_merge_fn() {
     this.push("tests");
     this.push("config_files");
     let fortytwo = this.join("fortytwo.toml");
+    let bar_hello = this.join("bar_hello.toml");
     let empty_args: &[&str] = &[];
 
     let (config, _) = config::Config::custom_args_and_optional_files(&["test", "--foo=42"], empty_args).unwrap();
@@ -35,4 +36,10 @@ fn custom_merge_fn() {
     assert_eq!(config.foo, Some(47));
     let (config, _) = config::Config::custom_args_and_optional_files(&["test", "--foo=5"], &[fortytwo]).unwrap();
     assert_eq!(config.foo, Some(47));
+    let (config, _) = config::Config::custom_args_and_optional_files(&["test", "--bar=Hello"], empty_args).unwrap();
+    assert_eq!(config.bar.as_ref().map(AsRef::as_ref), Some("Hello"));
+    let (config, _) = config::Config::custom_args_and_optional_files(&["test", "--bar=Hello", "--bar= world"], empty_args).unwrap();
+    assert_eq!(config.bar.as_ref().map(AsRef::as_ref), Some("Hello world"));
+    let (config, _) = config::Config::custom_args_and_optional_files(&["test", "--bar= world"], &[bar_hello]).unwrap();
+    assert_eq!(config.bar.as_ref().map(AsRef::as_ref), Some("Hello world"));
 }
