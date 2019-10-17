@@ -199,6 +199,33 @@ pub fn build_script<P: AsRef<Path>>(source: P) -> Result<(), Error> {
     load_and_generate_default(source).map(::std::mem::drop)
 }
 
+/// Generates the source code for you
+///
+/// Finds the specification in Cargo.toml `metadata.configure_me`
+///
+/// This function should be used from build script as it relies on cargo environment. It handles
+/// generating the name of the file (it's called `config.rs` inside `OUT_DIR`) as well as notifying
+/// cargo of the source file.
+pub fn build_script_auto() -> Result<(), Error> {
+    use manifest::SpecificationPaths;
+
+    let manifest_dir = manifest::get_dir()?;
+    let manifest_file = manifest_dir.join("Cargo.toml");
+
+    let paths = manifest_file
+        .load_manifest()?
+        .package.ok_or(manifest::Error::MissingPackage)?
+        .metadata.ok_or(manifest::Error::MissingMetadata)?
+        .configure_me.ok_or(manifest::Error::MissingConfigureMeMetadata)?
+        .spec_paths;
+
+    match paths {
+        SpecificationPaths::Single(path) => load_and_generate_default(manifest_dir.join(path)).map(::std::mem::drop),
+        SpecificationPaths::PerBinary(_) => unimplemented!(),
+        SpecificationPaths::Other(other) => match other._private {},
+    }
+}
+
 /// Generates the source code and manual page at default location.
 ///
 /// This is same as `build_script()`, but additionaly it generates a man page.
