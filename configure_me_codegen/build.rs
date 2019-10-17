@@ -1,9 +1,13 @@
-fn process_template(test_name: &str, out_dir: &str) {
+use std::path::{Path, PathBuf};
+
+fn process_template(test_name: &str, out_dir: &Path) {
     use std::io::{self, Write, BufRead, BufReader, BufWriter};
 
     let file = std::fs::File::open("tests/expected_outputs/config-template.rs").unwrap();
     let file = BufReader::new(file);
-    let mut output = BufWriter::new(std::fs::File::create(format!("{}/{}-config.rs", out_dir, test_name)).unwrap());
+    let out_file_name = out_dir.join(format!("{}-config.rs", test_name));
+    let output = std::fs::File::create(&out_file_name).expect("Failed to open test output file");
+    let mut output = BufWriter::new(output);
     for line in file.lines() {
         let line = line.unwrap();
 
@@ -19,13 +23,13 @@ fn process_template(test_name: &str, out_dir: &str) {
 }
 
 fn main() {
-    let out_dir = std::env::var("OUT_DIR").unwrap();
-    let out_dir = format!("{}/expected_outputs", out_dir);
-    std::fs::create_dir_all(&out_dir).unwrap();
+    let out_dir = PathBuf::from(std::env::var_os("OUT_DIR").expect("Missing OUT_DIR"));
+    let out_dir_expected_outputs = out_dir.join("expected_outputs");
+    std::fs::create_dir_all(&out_dir_expected_outputs).unwrap();
 
     let tests = ["empty", "single_optional_param", "single_mandatory_param", "single_default_param", "single_switch", "multiple_params", "no_arg", "short_switches", "conf_files", "with_custom_merge"];
 
     for test in &tests {
-        process_template(test, &out_dir);
+        process_template(test, &out_dir_expected_outputs);
     }
 }
