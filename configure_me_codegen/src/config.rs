@@ -52,16 +52,20 @@ mod ident {
         type Error = Error;
 
         fn try_from(string: String) -> Result<Ident, Error> {
-            for (i, c) in string.chars().enumerate() {
-                if c != '_' && ! ((c >= 'a' && c <= 'z') || (c >= '0' && c <= '9' && i > 0)) {
-                    return Err(Error {
+            let bad_char = string
+                .chars()
+                .enumerate()
+                .find(|&(i, c)| c != '_' && ! ((c >= 'a' && c <= 'z') || (c >= '0' && c <= '9' && i > 0)));
+
+            match bad_char {
+                Some((i, _)) => {
+                    Err(Error {
                         string,
                         position: i,
-                    });
-                }
+                    })
+                },
+                None => Ok(Ident(string)),
             }
-
-            Ok(Ident(string))
         }
     }
 
