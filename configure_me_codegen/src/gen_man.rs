@@ -1,23 +1,25 @@
 use ::config::Config;
+use super::manifest::{self, Manifest};
 use ::man::prelude::*;
 
-fn generate_meta(config: &Config) -> Manual {
+fn generate_meta(config: &Config, manifest: &Manifest) -> Result<Manual, manifest::Error> {
+    let package = manifest.package.as_ref().ok_or(manifest::Error::MissingPackage)?;
     let man = if let Some(name) = &config.general.name {
         Manual::new(name)
     } else {
-        Manual::new(&::build_helper::cargo::pkg::name())
+        Manual::new(&package.name)
     };
 
     let man = if let Some(summary) = &config.general.summary {
         man.about(&**summary)
-    } else if let Some(summary) = ::build_helper::cargo::pkg::description() {
-        man.about(summary)
+    } else if let Some(summary) = &package.description {
+        man.about(&**summary)
     } else {
         man
     };
 
-    let authors = ::build_helper::cargo::pkg::authors();
-    authors.iter().fold(man, |man, author| {
+    let authors = &package.authors;
+    Ok(authors.iter().fold(man, |man, author| {
         let mut name_email = author.split('<');
         if let Some(name) = name_email.next() {
             let author = Author::new(name.trim());
@@ -33,7 +35,7 @@ fn generate_meta(config: &Config) -> Manual {
         } else {
             man
         }
-    })
+    }))
 }
 
 fn generate_conf_file_param(man: Manual, config: &Config) -> Manual {
@@ -148,8 +150,8 @@ fn generate_switch_env_vars(man: Manual, config: &Config) -> Manual {
         .fold(man, |man, env| man.env(env))
 }
 
-pub fn generate_man_page(config: &Config) -> String {
-    let man = generate_meta(config);
+pub fn generate_man_page(config: &Config, manifest: &Manifest) -> Result<String, manifest::Error> {
+    let man = generate_meta(config, manifest)?;
     let man = if let Some(doc) = &config.general.doc {
         man.description(doc.to_owned())
     } else {
@@ -162,5 +164,5 @@ pub fn generate_man_page(config: &Config) -> String {
     let man = generate_param_env_vars(man, config);
     let man = generate_switch_env_vars(man, config);
 
-    man.render()
+    Ok(man.render())
 }

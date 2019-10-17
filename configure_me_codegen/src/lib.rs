@@ -12,7 +12,7 @@ extern crate pretty_assertions;
 */
 extern crate unicode_segmentation;
 extern crate fmt2io;
-extern crate build_helper;
+extern crate cargo_toml;
 #[cfg(feature = "man")]
 extern crate man;
 
@@ -23,9 +23,13 @@ pub (crate) mod gen_man;
 #[cfg(feature = "debconf")]
 pub (crate) mod debconf;
 
+pub mod manifest;
+
+use std::borrow::Borrow;
 use std::fmt;
 use std::io::{self, Read, Write};
 use std::path::{Path, PathBuf};
+use manifest::LoadManifest;
 
 #[derive(Debug)]
 enum ErrorData {
@@ -33,6 +37,8 @@ enum ErrorData {
     Config(config::ValidationError),
     Io(io::Error),
     Open { file: PathBuf, error: io::Error },
+    Manifest(manifest::Error),
+    MissingManifestDirEnvVar,
     MissingOutDir,
     #[cfg(feature = "debconf")]
     Debconf(debconf::Error),
@@ -47,9 +53,11 @@ impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match &self.data {
             ErrorData::Toml(err) => write!(f, "failed to parse config specification: {}", err),
+            ErrorData::Manifest(error) => write!(f, "failed to process manifest: {}", error),
             ErrorData::Config(err) => fmt::Display::fmt(err, f),
             ErrorData::Io(err) => write!(f, "I/O error: {}", err),
             ErrorData::Open { file, error } => write!(f, "failed to open file {}: {}", file.display(), error),
+            ErrorData::MissingManifestDirEnvVar => write!(f, "missing environment variable: CARGO_MANIFEST_DIR"),
             ErrorData::MissingOutDir => write!(f, "missing environment variable: OUT_DIR"),
             #[cfg(feature = "debconf")]
             ErrorData::Debconf(err) => write!(f, "failed to generate debconf: {}", err),
@@ -95,6 +103,29 @@ impl From<toml::de::Error> for Error {
         }
     }
 }
+
+impl From<manifest::Error> for Error {
+    fn from(err: manifest::Error) -> Self {
+        Error {
+            data: ErrorData::Manifest(err),
+        }
+    }
+}
+
+impl From<manifest::LoadError> for Error {
+    fn from(err: manifest::LoadError) -> Self {
+        Error {
+            data: ErrorData::Manifest(err.into()),
+        }
+    }
+}
+
+impl From<void::Void> for Error {
+    fn from(value: void::Void) -> Self {
+        match value {}
+    }
+}
+
 
 #[cfg(feature = "debconf")]
 impl From<debconf::Error> for Error {
@@ -184,12 +215,25 @@ pub fn build_script_with_man<P: AsRef<Path>>(source: P) -> Result<(), Error> {
 #[cfg(feature = "man")]
 pub fn build_script_with_man_written_to<P: AsRef<Path>, M: AsRef<Path> + Into<PathBuf>>(source: P, output: M) -> Result<(), Error> {
     let config_spec = load_and_generate_default(source)?;
-    let man_page = gen_man::generate_man_page(&config_spec);
+    let manifest = manifest::BuildScript.load_manifest()?;
+    let man_page = gen_man::generate_man_page(&config_spec, manifest.borrow())?;
 
     let mut file = create_file(output)?;
     file.write_all(man_page.as_bytes())?;
     #[cfg(feature = "debconf")]
     debconf::generate_if_requested(&config_spec)?;
+    Ok(())
+}
+
+/// Generates man page **only**.
+///
+/// This is useful outside build scripts.
+#[cfg(feature = "man")]
+pub fn generate_man<M: LoadManifest, W: std::io::Write, S: AsRef<Path>>(source: S, mut dest: W, manifest: M) -> Result<(), Error> where Error: std::convert::From<<M as manifest::LoadManifest>::Error> {
+    let config_spec = load_from_file(&source)?;
+    let manifest = manifest.load_manifest()?;
+    let man_page = gen_man::generate_man_page(&config_spec, manifest.borrow())?;
+    dest.write_all(man_page.as_bytes())?;
     Ok(())
 }
 
