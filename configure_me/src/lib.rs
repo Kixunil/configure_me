@@ -52,7 +52,7 @@
 //! extern crate configure_me;
 //! 
 //! fn main() {
-//!     configure_me::build_script("config_spec.toml").unwrap();
+//!     configure_me::build_script_auto().unwrap_or_exit();
 //! }
 //! ```
 //! 
@@ -62,6 +62,10 @@
 //! [packge]
 //! # ...
 //! build = "build.rs"
+//! 
+//! # This tells auto build script and other tools where to look for your specificcation
+//! [package.metadata.configure_me]
+//! spec = "config_spec.toml"
 //! 
 //! [dependencies]
 //! configure_me = "0.3"

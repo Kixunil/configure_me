@@ -7,7 +7,7 @@ About
 -----
 
 This crate aims to help with reading configuration of application from files, environment variables and command line arguments, merging it together and validating.
-It auto-generates most of the parsing and deserializing code for you based on build configuration (heh) file.
+It auto-generates most of the parsing and deserializing code for you based on specification file.
 It creates a struct for you, which you can use to read configuration into.
 It will contain all the parsed and validated fields, so you can access the information quickly easily and idiomatically.
 
@@ -51,12 +51,12 @@ Then, create a simple `build.rs` script like:
 ```rust
 extern crate configure_me_codegen;
 
-fn main() {
-    configure_me_codegen::build_script("config_spec.toml").unwrap();
+fn main() -> Result<(), configure_me_codegen::Error> {
+    configure_me_codegen::build_script_auto()
 }
 ```
 
-*Tip: use `configure_me::build_script_with_man` to generate man page as well.*
+*Tip: use [`cfg_me`](https://github.com/Kixunil/cfg_me) to generate a man page for your program.*
 
 Add dependencies to `Cargo.toml`:
 
@@ -64,6 +64,10 @@ Add dependencies to `Cargo.toml`:
 [package]
 # ...
 build = "build.rs"
+
+# This tells auto build script and other tools where to look for your specificcation
+[package.metadata.configure_me]
+spec = "config_spec.toml"
 
 [dependencies]
 configure_me = "0.3.3"
@@ -81,6 +85,7 @@ extern crate configure_me;
 include_config!();
 
 fn main() {
+    // Don't worry, unwrap_or_exit() prints a nice message instead of ugly panic
     let (server_config, _remaining_args) = Config::including_optional_config_files(&["/etc/my_awesome_server/server.conf"]).unwrap_or_exit();
 
     // Your code here
@@ -88,6 +93,14 @@ fn main() {
     let listener = std::net::TcpListener::bind((server_config.bind_addr, server_config.port)).expect("Failed to bind socket");
 }
 ```
+
+Manual page generation
+----------------------
+
+The crate exports an interface for generating manual pages, but I recommend you to not worry about it.
+There's a [tool](https://github.com/Kixunil/cfg_me) for generating extra files (currently only man page) from your specification. You can install it using `cargo`.
+
+After installing it, you can type `cfg_me man` to see the generated man page. Run `cfg_me -o program_name.1 man` to save it to a file.
 
 Debconf generation
 ------------------
@@ -137,7 +150,7 @@ debconf_priority = "medium"
 ```
 
 Finally build your application with `DEBCONF_OUT` environment variable set to existing directory
-where `configure_me` should generte the files.
+where `configure_me` should generate the files.
 
 Planned features
 ----------------
