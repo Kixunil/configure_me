@@ -852,7 +852,7 @@ pub fn generate_code<W: Write>(config: &Config, mut output: W) -> fmt::Result {
     writeln!(output, "                    std::mem::swap(&mut config, &mut new_config);")?;
     writeln!(output, "                    config.merge_in(new_config)")?;
     writeln!(output, "                }},")?;
-    writeln!(output, "                Err(Error::Reading {{ ref error, .. }}) if error.kind() == ::std::io::ErrorKind::NotFound => (),")?;
+    writeln!(output, "                Err(Error::Reading {{ ref error, .. }}) if error.kind() == ::std::io::ErrorKind::NotFound || error.kind() == ::std::io::ErrorKind::PermissionDenied => (),")?;
     writeln!(output, "                Err(err) => return Err(err),")?;
     writeln!(output, "            }}")?;
     writeln!(output, "        }}")?;
