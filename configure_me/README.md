@@ -13,6 +13,13 @@ It will contain all the parsed and validated fields, so you can access the infor
 
 The generated code is formatted to be easy to read and understand.
 
+Wait a second, why this crate doesn't use derive?
+-------------------------------------------------
+
+I'd love to use derive. Unfortunately it doesn't compose well with man page generation and other tooling.
+
+For a longer version, see [docs/why\_not\_derive.md](docs/why_not_derive.md)
+
 Example
 -------
 
