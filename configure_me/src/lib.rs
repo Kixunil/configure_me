@@ -113,5 +113,14 @@ macro_rules! include_config {
         }
 
         use config::prelude::*;
-    }
+    };
+    ($binary:literal) => {
+        mod config {
+            #![allow(unused)]
+
+            include!(concat!(env!("OUT_DIR"), "/", $binary, "_configure_me_config.rs"));
+        }
+
+        use config::prelude::*;
+    };
 }

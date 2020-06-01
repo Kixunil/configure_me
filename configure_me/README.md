@@ -101,6 +101,26 @@ fn main() {
 }
 ```
 
+If you need to generate different files for multiple binaries, create a separate file for each binary and then define them separately in `Cargo.toml`:
+
+```toml
+# config for binary foo
+[package.metadata.configure_me.bin]
+foo = "foo_config_spec.toml"
+
+# config for binary bar
+[package.metadata.configure_me.bin]
+bar = "bar_config_spec.toml"
+```
+
+And include the file in `foo` like this:
+
+```rust
+include_config!("foo");
+```
+
+This needs to be specific because there's no way to detect binary name.
+
 Manual page generation
 ----------------------
 

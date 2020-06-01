@@ -158,8 +158,18 @@ fn path_in_out_dir<P: AsRef<Path>>(file_name: P) -> Result<PathBuf, Error> {
     Ok(out)
 }
 
-fn default_out_file() -> Result<PathBuf, Error> {
-    path_in_out_dir("configure_me_config.rs")
+fn default_out_file(binary: Option<&str>) -> Result<PathBuf, Error> {
+    const GENERATED_FILE_NAME: &str = "configure_me_config.rs";
+
+    let file_name_owned;
+    let file_name = match binary {
+        Some(binary) => {
+            file_name_owned = format!("{}_{}", binary, GENERATED_FILE_NAME);
+            &file_name_owned
+        },
+        None => GENERATED_FILE_NAME,
+    };
+    path_in_out_dir(file_name)
 }
 
 // Wrapper for error conversions
@@ -174,9 +184,9 @@ fn generate_to_file<P: AsRef<Path> + Into<PathBuf>>(config_spec: &::config::Conf
      ::fmt2io::write(config_code, |config_code| codegen::generate_code(config_spec, config_code)).map_err(Into::into)
 }
 
-fn load_and_generate_default<P: AsRef<Path>>(source: P) -> Result<::config::Config, Error> {
+fn load_and_generate_default<P: AsRef<Path>>(source: P, binary: Option<&str>) -> Result<::config::Config, Error> {
     let config_spec = load_from_file(&source)?;
-    generate_to_file(&config_spec, default_out_file()?)?;
+    generate_to_file(&config_spec, default_out_file(binary)?)?;
     #[cfg(feature = "debconf")]
     debconf::generate_if_requested(&config_spec)?;
     println!("cargo:rerun-if-changed={}", source.as_ref().display());
@@ -196,7 +206,7 @@ pub fn generate_source<S: Read, O: Write>(source: S, output: O) -> Result<(), Er
 /// generating the name of the file (it's called `config.rs` inside `OUT_DIR`) as well as notifying
 /// cargo of the source file.
 pub fn build_script<P: AsRef<Path>>(source: P) -> Result<(), Error> {
-    load_and_generate_default(source).map(::std::mem::drop)
+    load_and_generate_default(source, None).map(::std::mem::drop)
 }
 
 /// Generates the source code for you
@@ -220,8 +230,13 @@ pub fn build_script_auto() -> Result<(), Error> {
         .spec_paths;
 
     match paths {
-        SpecificationPaths::Single(path) => load_and_generate_default(manifest_dir.join(path)).map(::std::mem::drop),
-        SpecificationPaths::PerBinary(_) => unimplemented!(),
+        SpecificationPaths::Single(path) => load_and_generate_default(manifest_dir.join(path), None).map(::std::mem::drop),
+        SpecificationPaths::PerBinary(binaries) => {
+            for (binary, path) in binaries {
+                load_and_generate_default(manifest_dir.join(path), Some(&binary)).map(::std::mem::drop)?;
+            }
+            Ok(())
+        },
         SpecificationPaths::Other(other) => match other._private {},
     }
 }
@@ -241,7 +256,7 @@ pub fn build_script_with_man<P: AsRef<Path>>(source: P) -> Result<(), Error> {
 /// page.
 #[cfg(feature = "man")]
 pub fn build_script_with_man_written_to<P: AsRef<Path>, M: AsRef<Path> + Into<PathBuf>>(source: P, output: M) -> Result<(), Error> {
-    let config_spec = load_and_generate_default(source)?;
+    let config_spec = load_and_generate_default(source, None)?;
     let manifest = manifest::BuildScript.load_manifest()?;
     let man_page = gen_man::generate_man_page(&config_spec, manifest.borrow())?;
 
