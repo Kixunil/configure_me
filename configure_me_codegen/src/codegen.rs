@@ -877,14 +877,18 @@ pub fn generate_code<W: Write>(config: &Config, mut output: W) -> fmt::Result {
     writeln!(output, "    type Item = T;")?;
     writeln!(output)?;
     writeln!(output, "    fn unwrap_or_exit(self) -> Self::Item {{")?;
+    writeln!(output, "        use std::io::Write;")?;
+    writeln!(output)?;
     writeln!(output, "        match self {{")?;
     writeln!(output, "            Ok(item) => item,")?;
     writeln!(output, "            Err(err @ Error::Arguments(ArgParseError::HelpRequested(_))) => {{")?;
     writeln!(output, "                println!(\"{{}}\", err);")?;
+    writeln!(output, "                std::io::stdout().flush().expect(\"failed to flush stdout\");")?;
     writeln!(output, "                ::std::process::exit(0)")?;
     writeln!(output, "            }},")?;
     writeln!(output, "            Err(err) => {{")?;
     writeln!(output, "                eprintln!(\"Error: {{}}\", err);")?;
+    writeln!(output, "                std::io::stderr().flush().expect(\"failed to flush stderr\");")?;
     writeln!(output, "                ::std::process::exit(1)")?;
     writeln!(output, "            }}")?;
     writeln!(output, "        }}")?;

@@ -220,14 +220,18 @@ impl<T> ResultExt for Result<T, Error> {
     type Item = T;
 
     fn unwrap_or_exit(self) -> Self::Item {
+        use std::io::Write;
+
         match self {
             Ok(item) => item,
             Err(err @ Error::Arguments(ArgParseError::HelpRequested(_))) => {
                 println!("{}", err);
+                std::io::stdout().flush().expect("failed to flush stdout");
                 ::std::process::exit(0)
             },
             Err(err) => {
                 eprintln!("Error: {}", err);
+                std::io::stderr().flush().expect("failed to flush stderr");
                 ::std::process::exit(1)
             }
         }
