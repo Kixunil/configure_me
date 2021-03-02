@@ -2,7 +2,7 @@
 name = "configure_me"
 version = "0.4.0"
 authors = ["Martin Habovstiak <martin.habovstiak@gmail.com>"]
-description = "A library for processing application configuration easily."
+description = "A library for easy processing of application configuration from files, environment variables and command line arguments."
 homepage = "https://github.com/Kixunil/configure_me"
 repository = "https://github.com/Kixunil/configure_me"
 readme = "README.md"
