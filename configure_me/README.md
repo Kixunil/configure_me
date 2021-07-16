@@ -36,21 +36,21 @@ First create `config_spec.toml` configuration file specifying all the parameters
 name = "port"
 type = "u16"
 optional = false
-# This text will be used in the documentation (help etc)
+# This text will be used in the documentation (help etc.)
 # It's not mandatory, but your progam will be ugly without it.
 doc = "Port to listen on."
 
 [[param]]
 name = "bind_addr"
-type = "::std::net::Ipv4Addr" # Yes, this works and  you can use your own types implementing Deserialize and ParseArg as well!
-default = "::std::net::Ipv4Addr::new(0, 0, 0, 0)" # Rust expression that creates the value
+type = "::std::net::Ipv4Addr" # Yes, this works and you can use your own types as well! (impl. Deserialize and ParseArg)
+default = "::std::net::Ipv4Addr::new(0, 0, 0, 0)" # Rust expression that creates the value.
 doc = "IP address to bind to."
 
 [[param]]
 name = "tls_cert"
 type = "String"
 doc = "Path to the TLS certificate. The connections will be unsecure if it isn't provided."
-# optional = true is the default, no need to add it here
+# optional = true is the default, no need to add it here.
 ```
 
 Then, create a simple `build.rs` script like:
@@ -72,7 +72,7 @@ Add dependencies to `Cargo.toml`:
 # ...
 build = "build.rs"
 
-# This tells auto build script and other tools where to look for your specificcation
+# This tells auto build script and other tools where to look for your specification.
 [package.metadata.configure_me]
 spec = "config_spec.toml"
 
@@ -83,7 +83,7 @@ configure_me = "0.4.0"
 configure_me_codegen = "0.4.0"
 ```
 
-And finally add appropriate incantiations into `src/main.rs`:
+And finally add appropriate incantations into `src/main.rs`:
 
 ```rust
 #[macro_use]
@@ -92,11 +92,10 @@ extern crate configure_me;
 include_config!();
 
 fn main() {
-    // Don't worry, unwrap_or_exit() prints a nice message instead of ugly panic
+    // Don't worry, unwrap_or_exit() prints a nice message instead of ugly panic.
     let (server_config, _remaining_args) = Config::including_optional_config_files(&["/etc/my_awesome_server/server.conf"]).unwrap_or_exit();
 
-    // Your code here
-    // E.g.:
+    // Your code here, for example:
     let listener = std::net::TcpListener::bind((server_config.bind_addr, server_config.port)).expect("Failed to bind socket");
 }
 ```
@@ -144,8 +143,8 @@ Then add debconf options to your configuration specification:
 
 ```toml
 [debconf]
-# Sets the name of the package
-# Enables debconf support
+# Sets the name of the package.
+# Enables debconf support.
 package_name = "my-awesome-app"
 
 [[param]]
@@ -154,19 +153,19 @@ type = "u16"
 optional = false
 # Documentation IS mandatory for debconf!
 doc = "Port to listen on."
-# Priority used for debconf questions
-# "high" is recommended for non-default, mandatory questions
-# In case of missing priority, the option is skipped!
+# Priority used for debconf questions "high" is recommended for non-default,
+# mandatory questions. In case of missing priority, the option is skipped!
 debconf_priority = "high"
 
 [[param]]
 name = "bind_addr"
 type = "::std::net::Ipv4Addr"
-default = "::std::net::Ipv4Addr::new(0, 0, 0, 0)" # Rust expression that creates the value
+# Rust expression that creates the default value.
+default = "::std::net::Ipv4Addr::new(0, 0, 0, 0)"
 doc = "IP address to bind to."
 debconf_priority = "low"
-# The default set by debconf. While it might seem redundant, this way the user sees the
-# default value when editing.
+# The default set by debconf.While it might seem redundant, this way the user
+# sees the default value when editing.
 debconf_default = "0.0.0.0"
 
 [[param]]
@@ -194,7 +193,7 @@ Comparison with clap
 
 `clap` is a great crate that works well. Unfortunately, it doesn't support reading from config files. It also has stringly-typed API, which adds boilerplate and (arguably small, but non-zero) runtime overhead.
 
-On the other hand, it's much more mature and supports some features, this crate doesn't (bash completion and native subcommands).
+On the other hand, it's much more mature and supports some features this crate doesn't (bash completion and native subcommands).
 
 `clap` may be more suitable for programs that should be easy to work with from command line, `configure_me` may be better for long-running processes with a lot of configuration options.
 
