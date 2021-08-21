@@ -53,7 +53,7 @@ doc = "Path to the TLS certificate. The connections will be unsecure if it isn't
 # optional = true is the default, no need to add it here.
 ```
 
-Then, create a simple `build.rs` script like:
+Then, create a simple `build.rs` script, or use `unstable-metabuild` on nightly (see below).
 
 ```rust
 extern crate configure_me_codegen;
@@ -119,6 +119,24 @@ include_config!("foo");
 ```
 
 This needs to be specific because there's no way to detect binary name.
+
+Metabuild feature
+-----------------
+
+If you use nightly you can avoid writing the build script by using metabuild instead.
+First inform yourself about metabuild status in the [tracking issue](https://github.com/rust-lang/rust/issues/49803).
+If you decided to try it out:
+
+0. Remove (or rename) `build.rs`.
+1. Add `cargo-features = ["metabuild"]` at the top of your `Cargo.toml` (above `[package]` section).
+2. Add `metabuild = ["configure_me_codegen"]` to `[package]` section of your `Cargo.toml`.
+3. Add `features = ["unstable-metabuild"]` to `configure_me_codegen` build dependency.
+4. Try building your project - it should work
+
+**Important: due to the nature of nightly features there are NO stability guarantees!**
+Any changes to the feature will ignore semver.
+If you want to get this stable soon test it in your project and report your experience in the tracking issue.
+Perhaps help with the Cargo code as well if needed.
 
 Manual page generation
 ----------------------

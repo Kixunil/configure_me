@@ -1,5 +1,17 @@
 //! This is the codegen part of `configure_me` crate. Please refer to the documentation of
-//! `configure_me`.
+//! `configure_me` for details.
+//!
+//! ## Unstable metabuild feature
+//!
+//! This crate supports nightly-only `metabuild` feature tracked in https://github.com/rust-lang/rust/issues/49803
+//! Since it is unstable you have to opt-in to instability by activating `unstable-metabuild` Cargo
+//! feature. If you enable it you don't have to write build script anymore, just add
+//! `metabuild = ["configure_me_codegen"]` to `[package]` section of your `Cargo.toml`. Note that
+//! you still have to specify the dependency (with the feature) in `[build-dependencies]`.
+//!
+//! No guarantees about stability are made because of the nature of nightly. Please use this only
+//! to test `metabuild` feture of Cargo and report your experience to the tracking issue. I look
+//! forward into having this stable and the main way of using this crate. Your reports will help.
 
 extern crate serde;
 #[macro_use]
@@ -202,6 +214,10 @@ pub fn generate_source<S: Read, O: Write>(source: S, output: O) -> Result<(), Er
 
 /// Generates the source code for you from provided `toml` configuration file.
 ///
+/// This function is deprecated because if you use it external tools will be unable to see the path
+/// to specification. It's much better to specify the path in `Cargo.toml` so that your app can be
+/// processed automatically. (E.g. to generate man page in packagers.)
+///
 /// This function should be used from build script as it relies on cargo environment. It handles
 /// generating the name of the file (it's called `config.rs` inside `OUT_DIR`) as well as notifying
 /// cargo of the source file.
@@ -252,6 +268,11 @@ pub fn metabuild() {
 
 /// Generates the source code and manual page at default location.
 ///
+/// This function is deprecated because generating man page in compilation step is surprising. An
+/// external `cfg_me` tool is provided that can generate the man page and save it to predictable
+/// location. This function uses `OUT_DIR` which is a weird place to put man page (and there's no
+/// better).
+///
 /// This is same as `build_script()`, but additionaly it generates a man page.
 /// The resulting man page will be stored in `$OUT_DIR/app.man`.
 #[cfg(feature = "man")]
@@ -262,6 +283,11 @@ pub fn build_script_with_man<P: AsRef<Path>>(source: P) -> Result<(), Error> {
 }
 
 /// Generates the source code and manual page at specified location.
+///
+/// This function is deprecated because generating man page in compilation step is surprising. An
+/// external `cfg_me` tool is provided that can generate the man page and save it to predictable
+/// location. This function needlessly burdens users of the crate to handle location configuration
+/// and makes it hard for toold like packagers to read the man page.
 ///
 /// This is same as `build_script_with_man()`, but it allows you to choose where to put the man
 /// page.
