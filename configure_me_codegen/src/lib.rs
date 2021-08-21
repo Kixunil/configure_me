@@ -246,7 +246,9 @@ pub fn build_script_auto() -> Result<(), Error> {
 /// This is same as `build_script()`, but additionaly it generates a man page.
 /// The resulting man page will be stored in `$OUT_DIR/app.man`.
 #[cfg(feature = "man")]
+#[deprecated = "use of cfg_me crate to build man pages is cleaner"]
 pub fn build_script_with_man<P: AsRef<Path>>(source: P) -> Result<(), Error> {
+    #[allow(deprecated)]
     build_script_with_man_written_to(source, path_in_out_dir("app.man")?)
 }
 
@@ -255,6 +257,7 @@ pub fn build_script_with_man<P: AsRef<Path>>(source: P) -> Result<(), Error> {
 /// This is same as `build_script_with_man()`, but it allows you to choose where to put the man
 /// page.
 #[cfg(feature = "man")]
+#[deprecated = "use of cfg_me crate to build man pages is cleaner"]
 pub fn build_script_with_man_written_to<P: AsRef<Path>, M: AsRef<Path> + Into<PathBuf>>(source: P, output: M) -> Result<(), Error> {
     let config_spec = load_and_generate_default(source, None)?;
     let manifest = manifest::BuildScript.load_manifest()?;
