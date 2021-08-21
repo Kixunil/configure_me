@@ -205,6 +205,7 @@ pub fn generate_source<S: Read, O: Write>(source: S, output: O) -> Result<(), Er
 /// This function should be used from build script as it relies on cargo environment. It handles
 /// generating the name of the file (it's called `config.rs` inside `OUT_DIR`) as well as notifying
 /// cargo of the source file.
+#[deprecated = "Use build_script_auto and put the path into Cargo.toml to expose it to external tools"]
 pub fn build_script<P: AsRef<Path>>(source: P) -> Result<(), Error> {
     load_and_generate_default(source, None).map(::std::mem::drop)
 }
