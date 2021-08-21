@@ -242,6 +242,14 @@ pub fn build_script_auto() -> Result<(), Error> {
     }
 }
 
+#[cfg(feature = "unstable-metabuild")]
+pub fn metabuild() {
+    build_script_auto().unwrap_or_else(|error| {
+        println!("Could not generate configuration parser: {}", error);
+        std::process::exit(1)
+    })
+}
+
 /// Generates the source code and manual page at default location.
 ///
 /// This is same as `build_script()`, but additionaly it generates a man page.

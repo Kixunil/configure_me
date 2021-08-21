@@ -14,6 +14,7 @@ build = "build.rs"
 [features]
 default = ["man"]
 debconf = []
+unstable-metabuild = []
 
 [dependencies]
 serde = "1.0.101"
