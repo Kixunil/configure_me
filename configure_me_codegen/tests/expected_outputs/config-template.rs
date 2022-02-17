@@ -135,7 +135,8 @@ mod raw {
 <<"merge_in.rs">>
         }
 
-        pub fn merge_args<I: IntoIterator<Item=::std::ffi::OsString>>(&mut self, args: I) -> Result<impl Iterator<Item=::std::ffi::OsString>, super::Error> {
+        pub fn merge_args<I: IntoIterator<Item=::std::ffi::OsString>>(&mut self, args: I, skip_default_conf_files: &mut bool) -> Result<impl Iterator<Item=::std::ffi::OsString>, super::Error> {
+            let _ = skip_default_conf_files;
             let mut iter = args.into_iter().fuse();
             self._program_path = iter.next().map(Into::into);
 
@@ -188,20 +189,27 @@ impl Config {
         A: IntoIterator, A::Item: Into<::std::ffi::OsString>,
         I: IntoIterator, I::Item: AsRef<::std::path::Path> {
 
+        let mut args_config = raw::Config::default();
+        let mut skip_default_conf_files = false;
+        let remaining_args = args_config.merge_args(args.into_iter().map(Into::into), &mut skip_default_conf_files)?;
+
         let mut config = raw::Config::default();
-        for path in config_files {
-            match raw::Config::load(path) {
-                Ok(mut new_config) => {
-                    std::mem::swap(&mut config, &mut new_config);
-                    config.merge_in(new_config)
-                },
-                Err(Error::Reading { ref error, .. }) if error.kind() == ::std::io::ErrorKind::NotFound => (),
-                Err(err) => return Err(err),
+
+        if !skip_default_conf_files {
+            for path in config_files {
+                match raw::Config::load(path) {
+                    Ok(mut new_config) => {
+                        std::mem::swap(&mut config, &mut new_config);
+                        config.merge_in(new_config)
+                    },
+                    Err(Error::Reading { ref error, .. }) if error.kind() == ::std::io::ErrorKind::NotFound => (),
+                    Err(err) => return Err(err),
+                }
             }
         }
 
         config.merge_env()?;
-        let remaining_args = config.merge_args(args.into_iter().map(Into::into))?;
+        config.merge_in(args_config);
 
         config
             .validate()

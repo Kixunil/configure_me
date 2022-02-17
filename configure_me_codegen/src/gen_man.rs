@@ -58,6 +58,16 @@ fn generate_conf_dir_param(man: Manual, config: &Config) -> Manual {
     }
 }
 
+fn generate_skip_default_conf_files_switch(man: Manual, config: &Config) -> Manual {
+    if let Some(switch) = &config.general.skip_default_conf_files_switch {
+        let opt = Flag::new().long(&::codegen::param_long_raw(switch.as_snake_case()));
+        let opt = opt.help("Skip loading default configuration files.");
+        man.flag(opt)
+    } else {
+        man
+    }
+}
+
 fn generate_params(man: Manual, config: &Config) -> Manual {
     config
         .params
@@ -159,6 +169,7 @@ pub fn generate_man_page(config: &Config, manifest: &Manifest) -> Result<String,
     };
     let man = generate_conf_file_param(man, config);
     let man = generate_conf_dir_param(man, config);
+    let man = generate_skip_default_conf_files_switch(man, config);
     let man = generate_params(man, config);
     let man = generate_switches(man, config);
     let man = generate_param_env_vars(man, config);

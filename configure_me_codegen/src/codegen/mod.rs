@@ -249,6 +249,11 @@ impl VisitWrite<visitor::MergeArgs> for ::config::General {
             writeln!(output, "                        self.merge_in(config);")?;
             writeln!(output, "                    }}")?;
         }
+
+        if let Some(skip_conf) = &self.skip_default_conf_files_switch {
+            writeln!(output, "                }} else if arg == \"--{}\" {{", skip_conf.as_hypenated())?;
+            writeln!(output, "                    *skip_default_conf_files = true;")?;
+        }
         Ok(())
     }
 }
@@ -403,6 +408,9 @@ fn gen_display_arg_parse_error<W: Write>(config: &Config, mut output: W) -> fmt:
         if let Some(conf_dir_param) = &config.general.conf_dir_param {
             write!(output, " [--{} CONF_DIR]", conf_dir_param.as_hypenated())?;
         }
+        if let Some(skip_default_conf_files_switch) = &config.general.skip_default_conf_files_switch {
+            write!(output, " [--{} CONF_DIR]", skip_default_conf_files_switch.as_hypenated())?;
+        }
         for param in config.params.iter().filter(|param| param.argument) {
             if let Some(abbr) = &param.abbr {
                 write!(output, " [-{} {}|--", abbr, param.name.as_upper_case())?;
@@ -470,6 +478,11 @@ fn gen_display_arg_parse_error<W: Write>(config: &Config, mut output: W) -> fmt:
             .as_ref()
             .map(|arg| (arg, Some("Load configuration from files in this directory."), SwitchKind::Normal { abbr: None, count: false }))
             .into_iter();
+        let skip_default_conf_files_switch = config
+            .general.skip_default_conf_files_switch
+            .as_ref()
+            .map(|arg| (arg, Some("Skip loading default configuration files."), SwitchKind::Normal { abbr: None, count: false }))
+            .into_iter();
 
         let params = config
             .params
@@ -481,7 +494,7 @@ fn gen_display_arg_parse_error<W: Write>(config: &Config, mut output: W) -> fmt:
             .iter()
             .map(|switch| (&switch.name, switch.doc.as_ref().map(AsRef::as_ref), switch.kind));
 
-        for (name, doc, switch_kind) in conf_file.chain(conf_dir).chain(params).chain(switches) {
+        for (name, doc, switch_kind) in conf_file.chain(conf_dir).chain(skip_default_conf_files_switch).chain(params).chain(switches) {
             if let Some(doc) = doc {
                 if doc.len() > 0 || sum_arg_len > (80 - 7) {
                     let name_len = match switch_kind {
@@ -792,7 +805,11 @@ pub fn generate_code<W: Write>(config: &Config, mut output: W) -> fmt::Result {
     write_params_and_switches::<visitor::MergeIn, _>(config, &mut output)?;
     writeln!(output, "        }}")?;
     writeln!(output)?;
-    writeln!(output, "        pub fn merge_args<I: IntoIterator<Item=::std::ffi::OsString>>(&mut self, args: I) -> Result<impl Iterator<Item=::std::ffi::OsString>, super::Error> {{")?;
+    writeln!(output, "        pub fn merge_args<I: IntoIterator<Item=::std::ffi::OsString>>(&mut self, args: I, skip_default_conf_files: &mut bool) -> Result<impl Iterator<Item=::std::ffi::OsString>, super::Error> {{")?;
+    // avoids unused warning
+    if config.general.skip_default_conf_files_switch.is_none() {
+        writeln!(output, "            let _ = skip_default_conf_files;")?;
+    }
     writeln!(output, "            let mut iter = args.into_iter().fuse();")?;
     writeln!(output, "            self._program_path = iter.next().map(Into::into);")?;
     writeln!(output)?;
@@ -845,20 +862,27 @@ pub fn generate_code<W: Write>(config: &Config, mut output: W) -> fmt::Result {
     writeln!(output, "        A: IntoIterator, A::Item: Into<::std::ffi::OsString>,")?;
     writeln!(output, "        I: IntoIterator, I::Item: AsRef<::std::path::Path> {{")?;
     writeln!(output)?;
+    writeln!(output, "        let mut args_config = raw::Config::default();")?;
+    writeln!(output, "        let mut skip_default_conf_files = false;")?;
+    writeln!(output, "        let remaining_args = args_config.merge_args(args.into_iter().map(Into::into), &mut skip_default_conf_files)?;")?;
+    writeln!(output)?;
     writeln!(output, "        let mut config = raw::Config::default();")?;
-    writeln!(output, "        for path in config_files {{")?;
-    writeln!(output, "            match raw::Config::load(path) {{")?;
-    writeln!(output, "                Ok(mut new_config) => {{")?;
-    writeln!(output, "                    std::mem::swap(&mut config, &mut new_config);")?;
-    writeln!(output, "                    config.merge_in(new_config)")?;
-    writeln!(output, "                }},")?;
-    writeln!(output, "                Err(Error::Reading {{ ref error, .. }}) if error.kind() == ::std::io::ErrorKind::NotFound => (),")?;
-    writeln!(output, "                Err(err) => return Err(err),")?;
+    writeln!(output)?;
+    writeln!(output, "        if !skip_default_conf_files {{")?;
+    writeln!(output, "            for path in config_files {{")?;
+    writeln!(output, "                match raw::Config::load(path) {{")?;
+    writeln!(output, "                    Ok(mut new_config) => {{")?;
+    writeln!(output, "                        std::mem::swap(&mut config, &mut new_config);")?;
+    writeln!(output, "                        config.merge_in(new_config)")?;
+    writeln!(output, "                    }},")?;
+    writeln!(output, "                    Err(Error::Reading {{ ref error, .. }}) if error.kind() == ::std::io::ErrorKind::NotFound => (),")?;
+    writeln!(output, "                    Err(err) => return Err(err),")?;
+    writeln!(output, "                }}")?;
     writeln!(output, "            }}")?;
     writeln!(output, "        }}")?;
     writeln!(output)?;
     writeln!(output, "        config.merge_env()?;")?;
-    writeln!(output, "        let remaining_args = config.merge_args(args.into_iter().map(Into::into))?;")?;
+    writeln!(output, "        config.merge_in(args_config);")?;
     writeln!(output)?;
     writeln!(output, "        config")?;
     writeln!(output, "            .validate()")?;

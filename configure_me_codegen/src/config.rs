@@ -355,6 +355,11 @@ pub struct General {
     /// directory, parse them, and override all
     /// configuration provided so far with them.
     pub conf_dir_param: Option<Ident>,
+
+    /// The name of the switch which, if
+    /// specified, avoids reading default
+    /// configuration files.
+    pub skip_default_conf_files_switch: Option<Ident>,
 }
 
 #[derive(Debug)]
