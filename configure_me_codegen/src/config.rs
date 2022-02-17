@@ -6,6 +6,7 @@ pub enum ValidationErrorKind {
     InvertedWithAbbr,
     InvertedWithCount,
     InvalidAbbr,
+    Duplicate,
 }
 
 #[derive(Debug)]
@@ -23,6 +24,7 @@ impl fmt::Display for ValidationError {
             InvertedWithAbbr => "inverted switch can't have short option",
             InvertedWithCount => "inverted switch can't be count",
             InvalidAbbr => "invalid short switch: must be [a-zA-Z]",
+            Duplicate => "the field appears more than once",
         };
 
         write!(f, "invalid configuration for field {}: {}", self.name, msg)
@@ -33,6 +35,7 @@ mod ident {
     use std::convert::TryFrom;
     use std::fmt::{self, Write};
 
+    #[derive(Debug)]
     pub struct Error {
         string: String,
         position: usize,
@@ -44,7 +47,7 @@ mod ident {
         }
     }
 
-    #[derive(Debug, Deserialize)]
+    #[derive(Debug, Clone, Eq, PartialEq, Hash, Deserialize)]
     #[serde(try_from = "String")]
     pub struct Ident(String);
 
@@ -136,6 +139,7 @@ mod ident {
 use self::ident::Ident;
 
 pub mod raw {
+    use std::convert::TryFrom;
     use super::{ValidationError, ValidationErrorKind, Optionality, SwitchKind};
     use super::ident::Ident;
 
@@ -173,17 +177,48 @@ pub mod raw {
 
     impl Config {
         pub fn validate(self) -> Result<super::Config, ValidationError> {
+            // just for checking order/determinism doesn't matter
+            use std::collections::HashSet;
+
+            fn check_insert(long_args: &mut HashSet<Ident>, arg: &Ident) -> Result<(), ValidationError> {
+                if long_args.insert(arg.clone()) {
+                    Ok(())
+                } else {
+                    Err(ValidationErrorKind::Duplicate).field_name(&arg)
+                }
+            }
+
+            fn check_insert_opt(long_args: &mut HashSet<Ident>, arg: &Option<Ident>) -> Result<(), ValidationError> {
+                if let Some(arg) = arg {
+                    check_insert(long_args, arg)
+                } else {
+                    Ok(())
+                }
+            }
+
             let default_optional = self.defaults.optional;
             let default_argument = self.defaults.args;
             let default_env_var = self.defaults.env_vars.unwrap_or(self.general.env_prefix.is_some());
+            let mut long_args = HashSet::new();
+            long_args.insert(Ident::try_from("help".to_owned()).unwrap());
+            check_insert_opt(&mut long_args, &self.general.conf_file_param)?;
+            check_insert_opt(&mut long_args, &self.general.conf_dir_param)?;
+            check_insert_opt(&mut long_args, &self.general.skip_default_conf_files_switch)?;
+
             let params = self.params
                 .into_iter()
-                .map(|param| param.validate(default_optional, default_argument, default_env_var))
+                .map(|param| {
+                    check_insert(&mut long_args, &param.name)?;
+                    param.validate(default_optional, default_argument, default_env_var)
+                })
                 .collect::<Result<Vec<_>, _>>()?;
 
             let switches = self.switches
                 .into_iter()
-                .map(|switch| switch.validate(default_env_var))
+                .map(|switch| {
+                    check_insert(&mut long_args, &switch.name)?;
+                    switch.validate(default_env_var)
+                })
                 .collect::<Result<Vec<_>, _>>()?;
 
             Ok(super::Config {
