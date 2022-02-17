@@ -17,11 +17,6 @@ extern crate serde;
 #[macro_use]
 extern crate serde_derive;
 extern crate toml;
-/*
-#[cfg(test)]
-#[macro_use]
-extern crate pretty_assertions;
-*/
 extern crate unicode_segmentation;
 extern crate fmt2io;
 extern crate cargo_toml;
@@ -533,10 +528,27 @@ merge_fn = "(|a: &mut String, b: String| a.push_str(&b))"
     };
 
     fn check(src: &str, expected: &str) {
+        use std::io::Write;
+
         let mut src = src.as_bytes();
         let mut out = Vec::new();
         generate_source(&mut src, &mut out).unwrap();
-        assert_eq!(::std::str::from_utf8(&out).unwrap(), expected);
+        if out != expected.as_bytes() {
+            let mut expected_temp = tempfile::Builder::new().prefix("expected").tempfile().unwrap();
+            let mut out_temp = tempfile::Builder::new().prefix("output").tempfile().unwrap();
+
+            expected_temp.write_all(expected.as_bytes()).unwrap();
+            out_temp.write_all(&out).unwrap();
+
+            std::process::Command::new("diff")
+                .arg(expected_temp.path())
+                .arg(out_temp.path())
+                .spawn()
+                .expect("failed to run diff")
+                .wait()
+                .unwrap();
+            panic!("output differs from expected");
+        }
     }
 
     #[test]

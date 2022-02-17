@@ -27,5 +27,5 @@ void = "1"
 man = { version = "0.1.1", optional = true }
 
 [dev-dependencies]
-pretty_assertions = "0.5.1"
 configure_me = { version = "0.4.0", path = "../configure_me" }
+tempfile = "3.3.0"
