@@ -1,6 +1,14 @@
 //! This is the codegen part of `configure_me` crate. Please refer to the documentation of
 //! `configure_me` for details.
 //!
+//! ## Beautiful error messages
+//!
+//! This crate supports emitting beautiful, Rust-like, error messages from build script.
+//! This improves developer experience a lot at the cost of longer compile times.
+//! Thus it is recommended to turn on the feature during development
+//! and keep it off during final release production build.
+//! To emit beautiful messages activate the `spanned` feature.
+//!
 //! ## Unstable metabuild feature
 //!
 //! This crate supports nightly-only `metabuild` feature tracked in https://github.com/rust-lang/rust/issues/49803
@@ -10,8 +18,11 @@
 //! you still have to specify the dependency (with the feature) in `[build-dependencies]`.
 //!
 //! No guarantees about stability are made because of the nature of nightly. Please use this only
-//! to test `metabuild` feture of Cargo and report your experience to the tracking issue. I look
+//! to test `metabuild` feature of Cargo and report your experience to the tracking issue. I look
 //! forward into having this stable and the main way of using this crate. Your reports will help.
+
+#[cfg(all(feature = "codespan-reporting", not(feature = "spanned")))]
+compile_error!("use of `codespan-reporting` feature is forbidden, use `spanned` INSTEAD");
 
 extern crate serde;
 #[macro_use]
@@ -22,6 +33,8 @@ extern crate fmt2io;
 extern crate cargo_toml;
 #[cfg(feature = "man")]
 extern crate man;
+#[cfg(feature = "spanned")]
+extern crate codespan_reporting;
 
 pub(crate) mod config;
 pub(crate) mod codegen;
@@ -38,10 +51,15 @@ use std::io::{self, Read, Write};
 use std::path::{Path, PathBuf};
 use manifest::LoadManifest;
 
+#[cfg(feature = "spanned")]
+type FileSpec = codespan_reporting::files::SimpleFile<String, String>;
+
+#[cfg(not(feature = "spanned"))]
+type FileSpec = ();
+
 #[derive(Debug)]
 enum ErrorData {
-    Toml(toml::de::Error),
-    Config(config::ValidationError),
+    Input(InputError),
     Io(io::Error),
     Open { file: PathBuf, error: io::Error },
     Manifest(manifest::Error),
@@ -49,6 +67,75 @@ enum ErrorData {
     MissingOutDir,
     #[cfg(feature = "debconf")]
     Debconf(debconf::Error),
+}
+
+#[derive(Debug)]
+struct InputError {
+    file: FileSpec,
+    source: InputErrorSource,
+}
+
+#[derive(Debug)]
+enum InputErrorSource {
+    Toml(toml::de::Error),
+    Config(Vec<config::ValidationError>),
+}
+
+impl InputError {
+    #[cfg(feature = "spanned")]
+    fn to_diagnostics(&self) -> impl Iterator<Item=codespan_reporting::diagnostic::Diagnostic<()>> + '_ {
+        use codespan_reporting::diagnostic::Label;
+
+        match &self.source {
+            InputErrorSource::Toml(error) => {
+                let diagnostic = codespan_reporting::diagnostic::Diagnostic::error()
+                    .with_message("failed to parse config specification");
+                let diagnostic = match error.line_col() {
+                    Some((line, col)) => {
+                        let line_sum = self.file.source().split('\n').take(line).map(|line| line.len()).sum::<usize>();
+                        // The code above deosn't account for '\n' characters so we add the count
+                        // here.
+                        let start = line_sum + col + line;
+                        let end = start + 1;
+                        diagnostic.with_labels(vec![
+                            Label::primary((), start..end).with_message(error.to_string()),
+                        ])
+                    },
+                    None => diagnostic.with_notes(vec![error.to_string()]),
+                };
+                Some(diagnostic).into_iter().chain(None.into_iter().flatten())
+            },
+            InputErrorSource::Config(errors) => None.into_iter().chain(Some(errors.iter().map(|error| error.to_diagnostic(()))).into_iter().flatten()),
+        }
+    }
+}
+
+impl fmt::Display for InputError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match &self.source {
+            InputErrorSource::Toml(err) => write!(f, "failed to parse config specification: {}", err),
+            InputErrorSource::Config(errors) => {
+                for error in errors {
+                    fmt::Display::fmt(&error, f)?;
+                    writeln!(f)?;
+                }
+                Ok(())
+            },
+        }
+    }
+}
+
+
+impl From<toml::de::Error> for InputErrorSource {
+    fn from(value: toml::de::Error) -> Self {
+        InputErrorSource::Toml(value)
+    }
+}
+
+impl From<Vec<config::ValidationError>> for InputErrorSource {
+    fn from(value: Vec<config::ValidationError>) -> Self {
+        InputErrorSource::Config(value)
+    }
 }
 
 /// Error that occured during code generation
@@ -59,9 +146,8 @@ pub struct Error {
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match &self.data {
-            ErrorData::Toml(err) => write!(f, "failed to parse config specification: {}", err),
             ErrorData::Manifest(error) => write!(f, "failed to process manifest: {}", error),
-            ErrorData::Config(err) => fmt::Display::fmt(err, f),
+            ErrorData::Input(error) => fmt::Display::fmt(error, f),
             ErrorData::Io(err) => write!(f, "I/O error: {}", err),
             ErrorData::Open { file, error } => write!(f, "failed to open file {}: {}", file.display(), error),
             ErrorData::MissingManifestDirEnvVar => write!(f, "missing environment variable: CARGO_MANIFEST_DIR"),
@@ -75,7 +161,118 @@ impl fmt::Display for Error {
 /// Implemented using `Display` so that it can be used with `Termination` to display nicer message.
 impl fmt::Debug for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        #[cfg(feature = "spanned")]
+        {
+            use codespan_reporting::term::termcolor::{NoColor};
+
+            struct WrapIo<W: fmt::Write>(W);
+
+            impl<W: fmt::Write> std::io::Write for WrapIo<W> {
+                fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+                    self.0.write_str(std::str::from_utf8(buf).unwrap()).map_err(|_| std::io::ErrorKind::Other)?;
+                    Ok(buf.len())
+                }
+
+                fn write_all(&mut self, buf: &[u8]) -> std::io::Result<()> {
+                    self.0.write_str(std::str::from_utf8(buf).unwrap()).map_err(|_| std::io::ErrorKind::Other.into())
+                }
+
+                fn flush(&mut self) -> std::io::Result<()> {
+                    Ok(())
+                }
+            }
+
+            if let ErrorData::Input(error) = &self.data {
+                writeln!(f, "invalid config specification:")?;
+                let diagnostics = error.to_diagnostics();
+
+                let mut writer = NoColor::new(WrapIo(&mut *f));
+                let config = codespan_reporting::term::Config::default();
+
+                for diagnostic in diagnostics {
+                    match codespan_reporting::term::emit(&mut writer, &config, &error.file, &diagnostic) {
+                        Ok(()) => (),
+                        Err(codespan_reporting::files::Error::Io(_)) => return Err(fmt::Error),
+                        Err(other) => panic!("unexpected error: {}", other),
+                    }
+                }
+                return Ok(());
+            }
+        }
         fmt::Display::fmt(self, f)
+    }
+}
+
+#[cfg(not(feature = "spanned"))]
+impl Error {
+    /// Prints a potentially-beautiful error report to stderr.
+    ///
+    /// This prints a beautiful error message to stderr when the `spanned` feature is on
+    /// or a non-beautiful error message otherwise.
+    ///
+    /// Note that this method **always** colors the output.
+    /// The rationale is that this is intended to be used in build scripts only and `cargo`
+    /// captures their output which would make it colorless.
+    /// To turn this off you can set the `NO_COLOR` environment variable.
+    /// You can also use plain `Debug` which is (unusually) user-friendly to support `Termination`.
+    ///
+    /// # Errors
+    ///
+    /// This method returns an error if writing fails.
+    pub fn report(&self) -> std::io::Result<()> {
+        write!(std::io::stderr().lock(), "{}", self)
+    }
+}
+
+#[cfg(feature = "spanned")]
+impl Error {
+    /// Prints a potentially-beautiful error report to stderr.
+    ///
+    /// This prints a beautiful error message to stderr when the `spanned` feature is on
+    /// or a non-beautiful error message otherwise
+    ///
+    /// Note that this method **always** colors the output.
+    /// The rationale is that this is intended to be used in build scripts only and `cargo`
+    /// captures their output which would make it colorless.
+    /// To turn this off you can set the `NO_COLOR` environment variable.
+    /// You can also use plain `Debug` which is (unusually) user-friendly to support `Termination`.
+    ///
+    /// # Errors
+    ///
+    /// This method returns an error if writing fails.
+    pub fn report(&self) -> std::io::Result<()> {
+        use codespan_reporting::term::termcolor::{ColorChoice, StandardStream};
+
+        if let ErrorData::Input(error) = &self.data {
+            let diagnostics = error.to_diagnostics();
+
+            let writer = StandardStream::stderr(ColorChoice::Always);
+            let mut writer = writer.lock();
+            let config = codespan_reporting::term::Config::default();
+
+            for diagnostic in diagnostics {
+                match codespan_reporting::term::emit(&mut writer, &config, &error.file, &diagnostic) {
+                    Ok(()) => (),
+                    Err(codespan_reporting::files::Error::Io(error)) => return Err(error),
+                    Err(other) => panic!("unexpected error: {}", other),
+                }
+            }
+            Ok(())
+        } else {
+            write!(std::io::stderr().lock(), "{}", self)
+        }
+    }
+}
+
+impl Error {
+    /// Reports the error and exits the program with non-zero exit code.
+    ///
+    /// # Panics
+    ///
+    /// This method panics if writing to stderr fails.
+    pub fn report_and_exit(&self) -> ! {
+        self.report().expect("failed to write to stderr");
+        std::process::exit(1);
     }
 }
 
@@ -87,26 +284,10 @@ impl From<ErrorData> for Error {
     }
 }
 
-impl From<config::ValidationError> for Error {
-    fn from(err: config::ValidationError) -> Self {
-        Error {
-            data: ErrorData::Config(err),
-        }
-    }
-}
-
 impl From<io::Error> for Error {
     fn from(err: io::Error) -> Self {
         Error {
             data: ErrorData::Io(err),
-        }
-    }
-}
-
-impl From<toml::de::Error> for Error {
-    fn from(err: toml::de::Error) -> Self {
-        Error {
-            data: ErrorData::Toml(err),
         }
     }
 }
@@ -143,19 +324,31 @@ impl From<debconf::Error> for Error {
     }
 }
 
-fn load<S: Read>(mut source: S) -> Result<config::Config, Error> {
-    let mut data = Vec::new();
-    source.read_to_end(&mut data)?;
-    let cfg = toml::from_slice::<config::raw::Config>(&data)?;
-    let cfg = cfg.validate()?;
+fn load<S: Read, N: fmt::Display>(mut source: S, name: N) -> Result<config::Config, Error> {
+    let mut data = String::new();
+    source.read_to_string(&mut data)?;
+    (|| {
+        let cfg = toml::from_str::<config::raw::Config>(&data)?;
+        let cfg = cfg.validate()?;
 
-    Ok(cfg)
+        Ok(cfg)
+    })().map_err(|source| {
+        #[cfg(feature = "spanned")]
+        {
+            ErrorData::Input(InputError { file: FileSpec::new(name.to_string(), data), source }).into()
+        }
+        #[cfg(not(feature = "spanned"))]
+        {
+            let _ = name;
+            ErrorData::Input(InputError{ file: (), source }).into()
+        }
+    })
 }
 
 fn load_from_file<P: AsRef<Path>>(source: P) -> Result<::config::Config, Error> {
      let config_spec = std::fs::File::open(&source).map_err(|error| ErrorData::Open { file: source.as_ref().into(), error })?;
 
-     load(config_spec)
+     load(config_spec, source.as_ref().display())
 }
 
 fn path_in_out_dir<P: AsRef<Path>>(file_name: P) -> Result<PathBuf, Error> {
@@ -202,7 +395,7 @@ fn load_and_generate_default<P: AsRef<Path>>(source: P, binary: Option<&str>) ->
 
 /// Generates the source code for you from provided `toml` configuration.
 pub fn generate_source<S: Read, O: Write>(source: S, output: O) -> Result<(), Error> {
-    let cfg = load(source)?;
+    let cfg = load(source, "unknown file")?;
     
      ::fmt2io::write(output, |output| codegen::generate_code(&cfg, output)).map_err(Into::into)
 }

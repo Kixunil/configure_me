@@ -14,6 +14,7 @@ build = "build.rs"
 [features]
 default = ["man"]
 debconf = []
+spanned = ["codespan-reporting"]
 unstable-metabuild = []
 
 [dependencies]
@@ -25,6 +26,8 @@ unicode-segmentation = "1.2"
 fmt2io = "0.1"
 void = "1"
 man = { version = "0.1.1", optional = true }
+# This feature is not public! Do not depend on it, depend on `spanned` instead!
+codespan-reporting = { version = "0.11.1", optional = true }
 
 [dev-dependencies]
 configure_me = { version = "0.4.0", path = "../configure_me" }
