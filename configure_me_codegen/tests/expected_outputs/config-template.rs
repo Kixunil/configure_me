@@ -10,6 +10,7 @@ pub enum ArgParseError {
 <<"arg_parse_error.rs">>
 }
 
+#[automatically_derived]
 impl ::std::fmt::Display for ArgParseError {
     fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
         match self {
@@ -20,6 +21,7 @@ impl ::std::fmt::Display for ArgParseError {
     }
 }
 
+#[automatically_derived]
 impl ::std::fmt::Debug for ArgParseError {
     fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
         ::std::fmt::Display::fmt(self, f)
@@ -30,6 +32,7 @@ pub enum EnvParseError {
 <<"env_parse_error.rs">>
 }
 
+#[automatically_derived]
 impl ::std::fmt::Display for EnvParseError {
     fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
         match *self {
@@ -38,6 +41,7 @@ impl ::std::fmt::Display for EnvParseError {
     }
 }
 
+#[automatically_derived]
 impl ::std::fmt::Debug for EnvParseError {
     fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
         ::std::fmt::Display::fmt(self, f)
@@ -48,6 +52,7 @@ pub enum ValidationError {
     MissingField(&'static str),
 }
 
+#[automatically_derived]
 impl ::std::fmt::Display for ValidationError {
     fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
         match self {
@@ -56,6 +61,7 @@ impl ::std::fmt::Display for ValidationError {
     }
 }
 
+#[automatically_derived]
 impl ::std::fmt::Debug for ValidationError {
     fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
         ::std::fmt::Display::fmt(self, f)
@@ -70,24 +76,28 @@ pub enum Error {
     Validation(ValidationError),
 }
 
+#[automatically_derived]
 impl From<ArgParseError> for Error {
     fn from(err: ArgParseError) -> Self {
         Error::Arguments(err)
     }
 }
 
+#[automatically_derived]
 impl From<EnvParseError> for Error {
     fn from(err: EnvParseError) -> Self {
         Error::Environment(err)
     }
 }
 
+#[automatically_derived]
 impl From<ValidationError> for Error {
     fn from(err: ValidationError) -> Self {
         Error::Validation(err)
     }
 }
 
+#[automatically_derived]
 impl ::std::fmt::Display for Error {
     fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
         match self {
@@ -100,6 +110,7 @@ impl ::std::fmt::Display for Error {
     }
 }
 
+#[automatically_derived]
 impl ::std::fmt::Debug for Error {
     fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
         ::std::fmt::Display::fmt(self, f)
@@ -117,6 +128,7 @@ mod raw {
 <<"raw_config.rs">>
     }
 
+    #[automatically_derived]
     impl Config {
         pub fn load<P: AsRef<::std::path::Path>>(config_file_name: P) -> Result<Self, super::Error> {
             use std::io::Read;
@@ -180,6 +192,7 @@ pub struct Config {
 <<"config.rs">>
 }
 
+#[automatically_derived]
 impl Config {
     pub fn including_optional_config_files<I>(config_files: I) -> Result<(Self, impl Iterator<Item=::std::ffi::OsString>), Error> where I: IntoIterator, I::Item: AsRef<::std::path::Path> {
         Self::custom_args_and_optional_files(::std::env::args_os(), config_files)
@@ -224,6 +237,7 @@ pub trait ResultExt {
     fn unwrap_or_exit(self) -> Self::Item;
 }
 
+#[automatically_derived]
 impl<T> ResultExt for Result<T, Error> {
     type Item = T;
 

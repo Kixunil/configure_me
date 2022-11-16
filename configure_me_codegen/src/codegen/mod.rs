@@ -680,6 +680,7 @@ pub fn generate_code<W: Write>(config: &Config, mut output: W) -> fmt::Result {
     gen_arg_parse_error(config, &mut output)?;
     writeln!(output, "}}")?;
     writeln!(output)?;
+    writeln!(output, "#[automatically_derived]")?;
     writeln!(output, "impl ::std::fmt::Display for ArgParseError {{")?;
     writeln!(output, "    fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {{")?;
     writeln!(output, "        match self {{")?;
@@ -690,6 +691,7 @@ pub fn generate_code<W: Write>(config: &Config, mut output: W) -> fmt::Result {
     writeln!(output, "    }}")?;
     writeln!(output, "}}")?;
     writeln!(output)?;
+    writeln!(output, "#[automatically_derived]")?;
     writeln!(output, "impl ::std::fmt::Debug for ArgParseError {{")?;
     writeln!(output, "    fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {{")?;
     writeln!(output, "        ::std::fmt::Display::fmt(self, f)")?;
@@ -700,6 +702,7 @@ pub fn generate_code<W: Write>(config: &Config, mut output: W) -> fmt::Result {
     gen_env_parse_error(config, &mut output)?;
     writeln!(output, "}}")?;
     writeln!(output)?;
+    writeln!(output, "#[automatically_derived]")?;
     writeln!(output, "impl ::std::fmt::Display for EnvParseError {{")?;
     writeln!(output, "    fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {{")?;
     writeln!(output, "        match *self {{")?;
@@ -708,6 +711,7 @@ pub fn generate_code<W: Write>(config: &Config, mut output: W) -> fmt::Result {
     writeln!(output, "    }}")?;
     writeln!(output, "}}")?;
     writeln!(output)?;
+    writeln!(output, "#[automatically_derived]")?;
     writeln!(output, "impl ::std::fmt::Debug for EnvParseError {{")?;
     writeln!(output, "    fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {{")?;
     writeln!(output, "        ::std::fmt::Display::fmt(self, f)")?;
@@ -718,6 +722,7 @@ pub fn generate_code<W: Write>(config: &Config, mut output: W) -> fmt::Result {
     writeln!(output, "    MissingField(&'static str),")?;
     writeln!(output, "}}")?;
     writeln!(output)?;
+    writeln!(output, "#[automatically_derived]")?;
     writeln!(output, "impl ::std::fmt::Display for ValidationError {{")?;
     writeln!(output, "    fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {{")?;
     writeln!(output, "        match self {{")?;
@@ -726,6 +731,7 @@ pub fn generate_code<W: Write>(config: &Config, mut output: W) -> fmt::Result {
     writeln!(output, "    }}")?;
     writeln!(output, "}}")?;
     writeln!(output)?;
+    writeln!(output, "#[automatically_derived]")?;
     writeln!(output, "impl ::std::fmt::Debug for ValidationError {{")?;
     writeln!(output, "    fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {{")?;
     writeln!(output, "        ::std::fmt::Display::fmt(self, f)")?;
@@ -740,24 +746,28 @@ pub fn generate_code<W: Write>(config: &Config, mut output: W) -> fmt::Result {
     writeln!(output, "    Validation(ValidationError),")?;
     writeln!(output, "}}")?;
     writeln!(output)?;
+    writeln!(output, "#[automatically_derived]")?;
     writeln!(output, "impl From<ArgParseError> for Error {{")?;
     writeln!(output, "    fn from(err: ArgParseError) -> Self {{")?;
     writeln!(output, "        Error::Arguments(err)")?;
     writeln!(output, "    }}")?;
     writeln!(output, "}}")?;
     writeln!(output)?;
+    writeln!(output, "#[automatically_derived]")?;
     writeln!(output, "impl From<EnvParseError> for Error {{")?;
     writeln!(output, "    fn from(err: EnvParseError) -> Self {{")?;
     writeln!(output, "        Error::Environment(err)")?;
     writeln!(output, "    }}")?;
     writeln!(output, "}}")?;
     writeln!(output)?;
+    writeln!(output, "#[automatically_derived]")?;
     writeln!(output, "impl From<ValidationError> for Error {{")?;
     writeln!(output, "    fn from(err: ValidationError) -> Self {{")?;
     writeln!(output, "        Error::Validation(err)")?;
     writeln!(output, "    }}")?;
     writeln!(output, "}}")?;
     writeln!(output)?;
+    writeln!(output, "#[automatically_derived]")?;
     writeln!(output, "impl ::std::fmt::Display for Error {{")?;
     writeln!(output, "    fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {{")?;
     writeln!(output, "        match self {{")?;
@@ -770,6 +780,7 @@ pub fn generate_code<W: Write>(config: &Config, mut output: W) -> fmt::Result {
     writeln!(output, "    }}")?;
     writeln!(output, "}}")?;
     writeln!(output)?;
+    writeln!(output, "#[automatically_derived]")?;
     writeln!(output, "impl ::std::fmt::Debug for Error {{")?;
     writeln!(output, "    fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {{")?;
     writeln!(output, "        ::std::fmt::Display::fmt(self, f)")?;
@@ -787,6 +798,7 @@ pub fn generate_code<W: Write>(config: &Config, mut output: W) -> fmt::Result {
     gen_raw_config(config, &mut output)?;
     writeln!(output, "    }}")?;
     writeln!(output)?;
+    writeln!(output, "    #[automatically_derived]")?;
     writeln!(output, "    impl Config {{")?;
     writeln!(output, "        pub fn load<P: AsRef<::std::path::Path>>(config_file_name: P) -> Result<Self, super::Error> {{")?;
     writeln!(output, "            use std::io::Read;")?;
@@ -853,6 +865,7 @@ pub fn generate_code<W: Write>(config: &Config, mut output: W) -> fmt::Result {
     write_params_and_switches::<visitor::ConfigFinal, _>(config, &mut output)?;
     writeln!(output, "}}")?;
     writeln!(output)?;
+    writeln!(output, "#[automatically_derived]")?;
     writeln!(output, "impl Config {{")?;
     writeln!(output, "    pub fn including_optional_config_files<I>(config_files: I) -> Result<(Self, impl Iterator<Item=::std::ffi::OsString>), Error> where I: IntoIterator, I::Item: AsRef<::std::path::Path> {{")?;
     writeln!(output, "        Self::custom_args_and_optional_files(::std::env::args_os(), config_files)")?;
@@ -897,6 +910,7 @@ pub fn generate_code<W: Write>(config: &Config, mut output: W) -> fmt::Result {
     writeln!(output, "    fn unwrap_or_exit(self) -> Self::Item;")?;
     writeln!(output, "}}")?;
     writeln!(output)?;
+    writeln!(output, "#[automatically_derived]")?;
     writeln!(output, "impl<T> ResultExt for Result<T, Error> {{")?;
     writeln!(output, "    type Item = T;")?;
     writeln!(output)?;
