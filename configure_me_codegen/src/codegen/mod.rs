@@ -719,6 +719,7 @@ pub fn generate_code<W: Write>(config: &Config, mut output: W) -> fmt::Result {
     writeln!(output, "}}")?;
     writeln!(output)?;
     writeln!(output, "pub enum ValidationError {{")?;
+    writeln!(output, "    #[allow(unused)]")?;
     writeln!(output, "    MissingField(&'static str),")?;
     writeln!(output, "}}")?;
     writeln!(output)?;

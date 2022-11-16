@@ -49,6 +49,7 @@ impl ::std::fmt::Debug for EnvParseError {
 }
 
 pub enum ValidationError {
+    #[allow(unused)]
     MissingField(&'static str),
 }
 
