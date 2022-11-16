@@ -226,7 +226,7 @@ impl VisitWrite<visitor::MergeArgs> for ::config::General {
         if let Some(conf_file) = &self.conf_file_param {
             writeln!(output, "                }} else if let Some(value) = ::configure_me::parse_arg::match_arg(\"--{}\", &arg, &mut iter) {{", conf_file.as_hypenated())?;
             writeln!(output, "                    let file_path: std::path::PathBuf = value.map_err(|err| err.map_or(ArgParseError::MissingArgument(\"--{}\"), |never| match never {{}}))?;", conf_file.as_hypenated())?;
-            writeln!(output, "                    let mut config = Config::load(file_path)?;")?;
+            writeln!(output, "                    let config = Config::load(file_path)?;")?;
             writeln!(output, "                    self.merge_in(config);")?;
         }
 
@@ -245,7 +245,7 @@ impl VisitWrite<visitor::MergeArgs> for ::config::General {
             writeln!(output, "                            Err(err) => return Err(ArgParseError::ReadConfDir(err, dir_path).into()),")?;
             writeln!(output, "                        }};")?;
             writeln!(output)?;
-            writeln!(output, "                        let mut config = Config::load(file.path())?;")?;
+            writeln!(output, "                        let config = Config::load(file.path())?;")?;
             writeln!(output, "                        self.merge_in(config);")?;
             writeln!(output, "                    }}")?;
         }
