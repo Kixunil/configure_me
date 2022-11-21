@@ -515,8 +515,7 @@ r#"
 [general]
 env_prefix = "TEST_APP"
 
-[[param]]
-name = "foo"
+[param.foo]
 type = "u32"
 "#;
 
@@ -525,8 +524,7 @@ r#"
 [general]
 env_prefix = "TEST_APP"
 
-[[param]]
-name = "foo"
+[param.foo]
 type = "u32"
 optional = false
 "#;
@@ -536,8 +534,7 @@ r#"
 [general]
 env_prefix = "TEST_APP"
 
-[[param]]
-name = "foo"
+[param.foo]
 type = "u32"
 default = "42"
 "#;
@@ -547,8 +544,7 @@ r#"
 [general]
 env_prefix = "TEST_APP"
 
-[[switch]]
-name = "foo"
+[switch.foo]
 "#;
 
     pub const MULTIPLE_PARAMS: &str =
@@ -556,30 +552,25 @@ r#"
 [general]
 env_prefix = "TEST_APP"
 
-[[param]]
-name = "foo"
+[param.foo]
 type = "u32"
 default = "42"
 doc = "A foo"
 
-[[param]]
-name = "bar"
+[param.bar]
 type = "String"
 optional = true
 doc = "A very, very, very, very, very, very, very, very, very, very, very, very, very, very long documentation..."
 
-[[param]]
-name = "baz"
+[param.baz]
 type = "String"
 optional = false
 doc = "A much, much, much, much, much, much, much, much, much, much, much, much, much, much, much, much, much, much, much, much, much, much, much, much, much, much, much, much, much, much, much, much, much, much, much, much, much, much, much, much, much, much longer documentation..."
 
-[[switch]]
-name = "verbose"
+[switch.verbose]
 # doc intentionally missing, because it's obious...
 
-[[switch]]
-name = "fast"
+[switch.fast]
 default = true
 doc = "Determines whether to mine bitcoins fast or slowly"
 "#;
@@ -589,42 +580,35 @@ r#"
 [general]
 env_prefix = "TEST_APP"
 
-[[param]]
-name = "foo"
+[param.foo]
 type = "u32"
 argument = false
 "#;
 
     pub const SHORT_SWITCHES: &str =
 r#"
-[[switch]]
-name = "a"
+[switch.a]
 abbr = "a"
 doc = "test"
 
-[[switch]]
-name = "b"
+[switch.b]
 abbr = "b"
 
-[[switch]]
-name = "c"
+[switch.c]
 abbr = "c"
 count = true
 
-[[param]]
-name = "d"
+[param.d]
 type = "String"
 abbr = "d"
 optional = true
 
-[[param]]
-name = "e"
+[param.e]
 type = "String"
 abbr = "e"
 optional = true
 
-[[switch]]
-name = "foo_bar"
+[switch.foo_bar]
 abbr = "f"
 "#;
 
@@ -635,8 +619,7 @@ env_prefix = "TEST_APP"
 conf_file_param = "config"
 conf_dir_param = "conf_dir"
 
-[[param]]
-name = "foo"
+[param.foo]
 type = "u32"
 doc = "A foo"
 "#;
@@ -646,13 +629,11 @@ r#"
 [general]
 env_prefix = "TEST_APP"
 
-[[param]]
-name = "foo"
+[param.foo]
 type = "u32"
 merge_fn = "(|a: &mut u32, b: u32| *a += b)"
 
-[[param]]
-name = "bar"
+[param.bar]
 type = "String"
 merge_fn = "(|a: &mut String, b: String| a.push_str(&b))"
 "#;

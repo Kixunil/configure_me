@@ -7,42 +7,32 @@ fn codespan_report() {
         conf_dir_param = "foo"
         skip_default_conf_files_switch = "help"
 
-        [[param]]
-        name = "bar"
+        [param.bar]
         type = "bool"
         default = "false"
         abbr = "x"
         optional = false
 
-        [[switch]]
-        name = "foo"
+        [param.foo]
+        type = "String"
+
+        [switch.foo]
         abbr = "x"
 
-        [[switch]]
-        name = "foo"
-        abbr = "x"
-
-        [[switch]]
-        name = "baz"
+        [switch.baz]
         abbr = "-"
 
-        [[switch]]
-        name = "0foo"
+        [switch.0foo]
 
-        [[switch]]
-        name = "-foo"
+        [switch.-foo]
 
-        [[switch]]
-        name = "foo-bar"
+        [switch.foo-bar]
 
-        [[switch]]
-        name = "1a=bit**loong   and ###weird@parameter"
+        [switch."1a=bit**loong   and ###weird@parameter"]
 
-        [[switch]]
-        name = "-a=bit**loong   and ###weird@parameter"
+        [switch."-a=bit**loong   and ###weird@parameter"]
 
-        [[switch]]
-        name = "a=bit**loong   and ###weird@parameter"
+        [switch."a=bit**loong   and ###weird@parameter"]
         "#;
 
     let expected = r#"invalid config specification:
@@ -54,11 +44,11 @@ error: the option `foo` appears more than once
  4 │         conf_dir_param = "foo"
    │                          ^^^^^ the option is repeated here
    ·
-15 │         name = "foo"
-   │                ^^^^^ ... and here
+13 │         [param.foo]
+   │                ^^^ ... and here
    ·
-19 │         name = "foo"
-   │                ^^^^^ ... and here
+16 │         [switch.foo]
+   │                 ^^^ ... and here
 
 error: use of reserved option
   ┌─ unknown file:5:42
@@ -67,61 +57,58 @@ error: use of reserved option
   │                                          ^^^^^^ this option is reserved because it's always implemented by `configure_me`
 
 error: parameter attempts to be both optional and mandatory at the same time
-   ┌─ unknown file:10:19
+   ┌─ unknown file:9:19
    │
- 8 │         name = "bar"
-   │                ----- in the parameter `bar`
- 9 │         type = "bool"
-10 │         default = "false"
+ 7 │         [param.bar]
+   │                --- in the parameter `bar`
+ 8 │         type = "bool"
+ 9 │         default = "false"
    │                   ^^^^^^^ the default value is provided here making the parameter optional
-11 │         abbr = "x"
-12 │         optional = false
+10 │         abbr = "x"
+11 │         optional = false
    │                    ^^^^^ setting `optional` to `false` makes the parameter mandatory here
    │
    = Help: either make the parameter optional or remove the default value
 
 error: the option `x` appears more than once
-   ┌─ unknown file:16:16
+   ┌─ unknown file:17:16
    │
-11 │         abbr = "x"
+10 │         abbr = "x"
    │                --- the option was first defined here
    ·
-16 │         abbr = "x"
+17 │         abbr = "x"
    │                ^^^ the option is repeated here
-   ·
-20 │         abbr = "x"
-   │                ^^^ ... and here
 
 error: invalid short option
-   ┌─ unknown file:24:16
+   ┌─ unknown file:20:16
    │
-23 │         name = "baz"
-   │                ----- in this field
-24 │         abbr = "-"
+19 │         [switch.baz]
+   │                 --- in this field
+20 │         abbr = "-"
    │                ^^^ this option uses an invalid character
    │
    = Note: only English letters (both lower case and upper case) are allowed
 
 error: the identifier `0foo` contains an invalid character
-   ┌─ unknown file:27:17
+   ┌─ unknown file:22:17
    │
-27 │         name = "0foo"
+22 │         [switch.0foo]
    │                 ^ the identifier starts with a digit
    │
    = Help: identifiers mut not start with digits
 
 error: the identifier `-foo` contains an invalid character
-   ┌─ unknown file:30:17
+   ┌─ unknown file:24:17
    │
-30 │         name = "-foo"
+24 │         [switch.-foo]
    │                 ^ this char is invalid
    │
    = Help: dashes are prepended automatically, you don't need to write them
 
 error: the identifier `foo-bar` contains an invalid character
-   ┌─ unknown file:33:20
+   ┌─ unknown file:26:20
    │
-33 │         name = "foo-bar"
+26 │         [switch.foo-bar]
    │                    ^ this char is invalid
    │
    = Help: consider replacing dashes with underscores.
@@ -129,43 +116,43 @@ error: the identifier `foo-bar` contains an invalid character
            but stay underscores in config files.
 
 error: the identifier `1a=bit**loong   and ###weird@parameter` contains invalid characters
-   ┌─ unknown file:36:17
+   ┌─ unknown file:28:18
    │
-36 │         name = "1a=bit**loong   and ###weird@parameter"
-   │                 ^ ^   ^^     ^^^   ^^^^     ^ ... and this char
-   │                 │ │   │      │     │         
-   │                 │ │   │      │     ... and these chars
-   │                 │ │   │      ... and these chars
-   │                 │ │   ... and these chars
-   │                 │ this char is invalid
-   │                 the identifier starts with a digit
+28 │         [switch."1a=bit**loong   and ###weird@parameter"]
+   │                  ^ ^   ^^     ^^^   ^^^^     ^ ... and this char
+   │                  │ │   │      │     │         
+   │                  │ │   │      │     ... and these chars
+   │                  │ │   │      ... and these chars
+   │                  │ │   ... and these chars
+   │                  │ this char is invalid
+   │                  the identifier starts with a digit
    │
    = Help: identifiers mut not start with digits
 
 error: the identifier `-a=bit**loong   and ###weird@parameter` contains invalid characters
-   ┌─ unknown file:39:17
+   ┌─ unknown file:30:18
    │
-39 │         name = "-a=bit**loong   and ###weird@parameter"
-   │                 ^ ^   ^^     ^^^   ^^^^     ^ ... and this char
-   │                 │ │   │      │     │         
-   │                 │ │   │      │     ... and these chars
-   │                 │ │   │      ... and these chars
-   │                 │ │   ... and these chars
-   │                 │ ... and this char
-   │                 this char is invalid
+30 │         [switch."-a=bit**loong   and ###weird@parameter"]
+   │                  ^ ^   ^^     ^^^   ^^^^     ^ ... and this char
+   │                  │ │   │      │     │         
+   │                  │ │   │      │     ... and these chars
+   │                  │ │   │      ... and these chars
+   │                  │ │   ... and these chars
+   │                  │ ... and this char
+   │                  this char is invalid
    │
    = Help: dashes are prepended automatically, you don't need to write them
 
 error: the identifier `a=bit**loong   and ###weird@parameter` contains invalid characters
-   ┌─ unknown file:42:18
+   ┌─ unknown file:32:19
    │
-42 │         name = "a=bit**loong   and ###weird@parameter"
-   │                  ^   ^^     ^^^   ^^^^     ^ ... and this char
-   │                  │   │      │     │         
-   │                  │   │      │     ... and these chars
-   │                  │   │      ... and these chars
-   │                  │   ... and these chars
-   │                  this char is invalid
+32 │         [switch."a=bit**loong   and ###weird@parameter"]
+   │                   ^   ^^     ^^^   ^^^^     ^ ... and this char
+   │                   │   │      │     │         
+   │                   │   │      │     ... and these chars
+   │                   │   │      ... and these chars
+   │                   │   ... and these chars
+   │                   this char is invalid
 
 "#;
     let error_messages = format!("{:?}", configure_me_codegen::generate_source(toml.as_bytes(), std::io::sink()).unwrap_err());

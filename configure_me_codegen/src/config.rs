@@ -310,6 +310,14 @@ mod ident {
 
             match self {
                 Error::InvalidChars { string, positions, span } => {
+                    let offset = if string.len() == span.end - span.start {
+                        // no quotes
+                        0
+                    } else {
+                        // quotes were used so we have to add 1 to spans
+                        1
+                    };
+
                     // this may over-allocate but it's better to be fast than memory-saving
                     let mut labels = Vec::with_capacity(positions.len());
                     let mut positions = positions.iter();
@@ -322,7 +330,7 @@ mod ident {
 
                     // first one is special
                     let diagnostic = if string.starts_with(|c| c >= '0' && c <= '9') {
-                        labels.push(Label::primary(file_id, (span.start + 1)..(span.start + 2)).with_message("the identifier starts with a digit"));
+                        labels.push(Label::primary(file_id, (span.start + offset)..(span.start + 1 + offset)).with_message("the identifier starts with a digit"));
                         positions.next().expect("starting with zero is recorded");
                         diagnostic.with_notes(vec!["Help: identifiers mut not start with digits".to_owned()])
                     } else if string.starts_with('-') {
@@ -350,13 +358,13 @@ mod ident {
                             if *position == last_end {
                                 last_end += 1;
                             } else {
-                                labels.push(create_label(span.start + last_start + 1, span.start + last_end + 1, was_emitted));
+                                labels.push(create_label(span.start + last_start + offset, span.start + last_end + offset, was_emitted));
                                 was_emitted = true;
                                 last_start = *position;
                                 last_end = *position + 1;
                             }
                         }
-                        labels.push(create_label(span.start + last_start + 1, span.start + last_end + 1, was_emitted));
+                        labels.push(create_label(span.start + last_start + offset, span.start + last_end + offset, was_emitted));
                     }
 
                     diagnostic
@@ -392,9 +400,57 @@ impl From<Span> for core::ops::Range<usize> {
 pub mod raw {
     use toml::Spanned;
     use std::convert::TryFrom;
+    use std::fmt;
     use super::{ValidationError, FieldError, ValidationErrorSource, Optionality, SwitchKind};
     use super::ident::Ident;
     use super::Span;
+
+    #[derive(Debug)]
+    struct Kv<V>(Spanned<String>, V);
+
+    #[derive(Debug)]
+    struct Map<V>(Vec<Kv<V>>);
+
+    impl<V> Default for Map<V> {
+        fn default() -> Self {
+            Map(Default::default())
+        }
+    }
+
+    impl<'de, V: serde::Deserialize<'de>> serde::Deserialize<'de> for Map<V> {
+        fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+            struct Visitor<V>(std::marker::PhantomData<fn() -> V>);
+
+            impl<'de, V: serde::Deserialize<'de>> serde::de::Visitor<'de> for Visitor<V> {
+                type Value = Map<V>;
+
+                fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
+                    f.write_str("a map")
+                }
+
+                fn visit_map<A: serde::de::MapAccess<'de>>(self, mut map: A) -> Result<Self::Value, A::Error> {
+                    let mut vec = Vec::with_capacity(map.size_hint().unwrap_or(0));
+
+                    while let Some((key, value)) = map.next_entry()? {
+                        vec.push(Kv(key, value));
+                    }
+
+                    Ok(Map(vec))
+                }
+            }
+
+            deserializer.deserialize_map(Visitor(Default::default()))
+        }
+    }
+
+    impl<V> IntoIterator for Map<V> {
+        type Item = Kv<V>;
+        type IntoIter = std::vec::IntoIter<Kv<V>>;
+
+        fn into_iter(self) -> Self::IntoIter {
+            self.0.into_iter()
+        }
+    }
 
     impl<'a, T> From<&'a Spanned<T>> for Span {
         fn from(value: &'a Spanned<T>) -> Self {
@@ -520,10 +576,10 @@ pub mod raw {
     pub struct Config {
         #[serde(rename = "param")]
         #[serde(default)]
-        pub params: Vec<Param>,
+        params: Map<Param>,
         #[serde(rename = "switch")]
         #[serde(default)]
-        pub switches: Vec<Switch>,
+        switches: Map<Switch>,
         #[serde(default)]
         general: General,
         #[serde(default)]
@@ -548,22 +604,22 @@ pub mod raw {
             let params = self.params
                 .into_iter()
                 .filter_map(|param| {
-                    long_args.check_insert_long(&param.name).unwrap_or_else(|error| errors.push(error));
-                    if let Some(abbr) = &param.abbr {
-                        short_args.check_insert(abbr).field_name(&param.name).unwrap_or_else(|error| errors.push(error));
+                    long_args.check_insert_long(&param.0).unwrap_or_else(|error| errors.push(error));
+                    if let Some(abbr) = &param.1.abbr {
+                        short_args.check_insert(abbr).field_name(&param.0).unwrap_or_else(|error| errors.push(error));
                     }
-                    param.validate(default_optional, default_argument, default_env_var).map_err(|error| errors.extend(error)).ok()
+                    param.validate_param(default_optional, default_argument, default_env_var).map_err(|error| errors.extend(error)).ok()
                 })
                 .collect::<Vec<_>>();
 
             let switches = self.switches
                 .into_iter()
                 .filter_map(|switch| {
-                    long_args.check_insert_long(&switch.name).unwrap_or_else(|error| errors.push(error));
-                    if let Some(abbr) = &switch.abbr {
-                        short_args.check_insert(abbr).field_name(&switch.name).unwrap_or_else(|error| errors.push(error));
+                    long_args.check_insert_long(&switch.0).unwrap_or_else(|error| errors.push(error));
+                    if let Some(abbr) = &switch.1.abbr {
+                        short_args.check_insert(abbr).field_name(&switch.0).unwrap_or_else(|error| errors.push(error));
                     }
-                    switch.validate(default_env_var).map_err(|error| errors.extend(error)).ok()
+                    switch.validate_switch(default_env_var).map_err(|error| errors.extend(error)).ok()
                 })
                 .collect::<Vec<_>>();
 
@@ -623,8 +679,7 @@ pub mod raw {
     #[derive(Debug)]
     #[derive(Deserialize)]
     #[serde(deny_unknown_fields)]
-    pub struct Param {
-        name: Spanned<String>,
+    struct Param {
         abbr: Option<Spanned<char>>,
         #[serde(rename = "type")]
         ty: String,
@@ -652,36 +707,38 @@ pub mod raw {
                 (None, false, None) => Ok(Optionality::Mandatory),
             }
         }
+    }
 
-        fn validate(self, default_optional: bool, default_argument: bool, default_env_var: bool) -> Result<super::Param, impl Iterator<Item=ValidationError>> {
-            let optionality = Param::validate_optionality(self.optional, default_optional, self.default)
-                .field_name(&self.name);
-            let name = Ident::try_from(self.name).map_err(Into::into);
+    impl Kv<Param> {
+        fn validate_param(self, default_optional: bool, default_argument: bool, default_env_var: bool) -> Result<super::Param, impl Iterator<Item=ValidationError>> {
+            let optionality = Param::validate_optionality(self.1.optional, default_optional, self.1.default)
+                .field_name(&self.0);
+            let name = Ident::try_from(self.0).map_err(Into::into);
 
             let (name, optionality) = match (name, optionality) {
                 (Ok(name), Ok(optionality)) => (name, optionality),
                 (err1, err2) => return Err(err1.err().into_iter().chain(err2.err())),
             };
 
-            let ty = self.ty;
-            let argument = self.argument.unwrap_or(default_argument);
-            let env_var = self.env_var.unwrap_or(default_env_var);
-            let convert_into = self.convert_into.unwrap_or_else(|| ty.clone());
+            let ty = self.1.ty;
+            let argument = self.1.argument.unwrap_or(default_argument);
+            let env_var = self.1.env_var.unwrap_or(default_env_var);
+            let convert_into = self.1.convert_into.unwrap_or_else(|| ty.clone());
 
             Ok(super::Param {
                 name,
                 ty,
                 optionality,
-                abbr: self.abbr.map(Spanned::into_inner),
-                doc: self.doc,
+                abbr: self.1.abbr.map(Spanned::into_inner),
+                doc: self.1.doc,
                 argument,
                 env_var,
                 convert_into,
-                merge_fn: self.merge_fn,
+                merge_fn: self.1.merge_fn,
                 #[cfg(feature = "debconf")]
-                debconf_priority: self.debconf_priority,
+                debconf_priority: self.1.debconf_priority,
                 #[cfg(feature = "debconf")]
-                debconf_default: self.debconf_default,
+                debconf_default: self.1.debconf_default,
             })
         }
     }
@@ -689,8 +746,7 @@ pub mod raw {
     #[derive(Debug)]
     #[derive(Deserialize)]
     #[serde(deny_unknown_fields)]
-    pub struct Switch {
-        name: Spanned<String>,
+    struct Switch {
         abbr: Option<Spanned<char>>,
         default: Option<Spanned<bool>>,
         doc: Option<String>,
@@ -718,12 +774,14 @@ pub mod raw {
                 (abbr, _, count) => Ok(SwitchKind::Normal { abbr: abbr.map(Spanned::into_inner), count: count.map(Spanned::into_inner).unwrap_or(false) }),
             }
         }
+    }
 
-        fn validate(self, default_env_var: bool) -> Result<super::Switch, impl Iterator<Item=ValidationError>> {
-            let abbr = self.abbr;
-            let default = self.default;
-            let count = self.count;
-            let name = &self.name;
+    impl Kv<Switch> {
+        fn validate_switch(self, default_env_var: bool) -> Result<super::Switch, impl Iterator<Item=ValidationError>> {
+            let abbr = self.1.abbr;
+            let default = self.1.default;
+            let count = self.1.count;
+            let name = &self.0;
 
             let kind = abbr
                 .map(Switch::validate_abbr)
@@ -734,7 +792,7 @@ pub mod raw {
                         .field_name(name)
                 });
 
-            let name = Ident::try_from(self.name).map_err(Into::into);
+            let name = Ident::try_from(self.0).map_err(Into::into);
 
             let (name, kind) = match (name, kind) {
                 (Ok(name), Ok(kind)) => (name, kind),
@@ -744,10 +802,10 @@ pub mod raw {
             Ok(super::Switch {
                 name,
                 kind,
-                doc: self.doc,
-                env_var: self.env_var.unwrap_or(default_env_var),
+                doc: self.1.doc,
+                env_var: self.1.env_var.unwrap_or(default_env_var),
                 #[cfg(feature = "debconf")]
-                debconf_priority: self.debconf_priority,
+                debconf_priority: self.1.debconf_priority,
             })
         }
     }
