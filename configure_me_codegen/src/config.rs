@@ -649,6 +649,7 @@ pub mod raw {
                 conf_file_param,
                 conf_dir_param,
                 skip_default_conf_files_switch,
+                require_program_name: self.general.require_program_name,
             };
 
             Ok(super::Config {
@@ -673,6 +674,8 @@ pub mod raw {
         conf_file_param: Option<Spanned<String>>,
         conf_dir_param: Option<Spanned<String>>,
         skip_default_conf_files_switch: Option<Spanned<String>>,
+        #[serde(default)]
+        require_program_name: bool,
     }
 
 
@@ -857,6 +860,12 @@ pub struct General {
     /// specified, avoids reading default
     /// configuration files.
     pub skip_default_conf_files_switch: Option<Ident>,
+
+    /// Whether the program name, the zeroth argument, is required.
+    ///
+    /// If the program name is required this will change the type from `Option<PathBuf>` to
+    /// `PathBuf` and report nice error out-of-the-box.
+    pub require_program_name: bool,
 }
 
 #[derive(Debug)]

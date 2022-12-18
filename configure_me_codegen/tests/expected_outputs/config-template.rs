@@ -119,13 +119,11 @@ impl ::std::fmt::Debug for Error {
 }
 
 mod raw {
-    use ::std::path::PathBuf;
     use super::{ArgParseError, ValidationError};
 
     #[derive(Deserialize, Default)]
     #[serde(crate = "crate::configure_me::serde")]
     pub struct Config {
-        _program_path: Option<PathBuf>,
 <<"raw_config.rs">>
     }
 
@@ -148,21 +146,21 @@ mod raw {
 <<"merge_in.rs">>
         }
 
-        pub fn merge_args<I: IntoIterator<Item=::std::ffi::OsString>>(&mut self, args: I, skip_default_conf_files: &mut bool) -> Result<impl Iterator<Item=::std::ffi::OsString>, super::Error> {
+        pub fn merge_args<I: IntoIterator<Item=::std::ffi::OsString>>(&mut self, args: I, skip_default_conf_files: &mut bool) -> Result<(Option<std::path::PathBuf>, impl Iterator<Item=::std::ffi::OsString>), super::Error> {
             let _ = skip_default_conf_files;
             let mut iter = args.into_iter().fuse();
-            self._program_path = iter.next().map(Into::into);
+            let program_path = iter.next().map(Into::into);
 
             while let Some(arg) = iter.next() {
                 if arg == *"--" {
-                    return Ok(None.into_iter().chain(iter));
+                    return Ok((program_path, None.into_iter().chain(iter)));
                 } else if (arg == *"--help") || (arg == *"-h") {
-                    return Err(ArgParseError::HelpRequested(self._program_path.as_ref().unwrap().to_string_lossy().into()).into());
+                    return Err(ArgParseError::HelpRequested(program_path.as_ref().unwrap().to_string_lossy().into()).into());
 <<"merge_args.rs">>
                 } else if let Some(mut shorts) = ::configure_me::parse_arg::iter_short(&arg) {
                     for short in &mut shorts {
                         if short == 'h' {
-                            return Err(ArgParseError::HelpRequested(self._program_path.as_ref().unwrap().to_string_lossy().into()).into())
+                            return Err(ArgParseError::HelpRequested(program_path.as_ref().unwrap().to_string_lossy().into()).into())
 <<"merge_short_args.rs">>
                         } else {
                             let mut arg = String::with_capacity(2);
@@ -174,11 +172,11 @@ mod raw {
                 } else if arg.to_str().unwrap_or("").starts_with("--") {
                     return Err(ArgParseError::UnknownArgument(arg.into_string().unwrap()).into());
                 } else {
-                    return Ok(Some(arg).into_iter().chain(iter))
+                    return Ok((program_path, Some(arg).into_iter().chain(iter)))
                 }
             }
 
-            Ok(None.into_iter().chain(iter))
+            Ok((program_path, None.into_iter().chain(iter)))
         }
 
         pub fn merge_env(&mut self) -> Result<(), super::Error> {
@@ -195,17 +193,17 @@ pub struct Config {
 
 #[automatically_derived]
 impl Config {
-    pub fn including_optional_config_files<I>(config_files: I) -> Result<(Self, impl Iterator<Item=::std::ffi::OsString>), Error> where I: IntoIterator, I::Item: AsRef<::std::path::Path> {
+    pub fn including_optional_config_files<I>(config_files: I) -> Result<(Self, impl Iterator<Item=::std::ffi::OsString>, Metadata), Error> where I: IntoIterator, I::Item: AsRef<::std::path::Path> {
         Self::custom_args_and_optional_files(::std::env::args_os(), config_files)
     }
 
-    pub fn custom_args_and_optional_files<A, I>(args: A, config_files: I) -> Result<(Self, impl Iterator<Item=::std::ffi::OsString>), Error> where
+    pub fn custom_args_and_optional_files<A, I>(args: A, config_files: I) -> Result<(Self, impl Iterator<Item=::std::ffi::OsString>, Metadata), Error> where
         A: IntoIterator, A::Item: Into<::std::ffi::OsString>,
         I: IntoIterator, I::Item: AsRef<::std::path::Path> {
 
         let mut args_config = raw::Config::default();
         let mut skip_default_conf_files = false;
-        let remaining_args = args_config.merge_args(args.into_iter().map(Into::into), &mut skip_default_conf_files)?;
+        let (program_name, remaining_args) = args_config.merge_args(args.into_iter().map(Into::into), &mut skip_default_conf_files)?;
 
         let mut config = raw::Config::default();
 
@@ -225,11 +223,24 @@ impl Config {
         config.merge_env()?;
         config.merge_in(args_config);
 
+        let metadata = Metadata {
+            program_name,
+        };
+
         config
             .validate()
-            .map(|cfg| (cfg, remaining_args))
+            .map(|cfg| (cfg, remaining_args, metadata))
             .map_err(Into::into)
     }
+}
+
+/// Metadata of the configuration.
+///
+/// This struct provides some additional information regarding the configuration.
+/// Currently it only contains program name but more items could be available in the future.
+#[non_exhaustive]
+pub struct Metadata {
+    pub program_name: Option<std::path::PathBuf>,
 }
 
 pub trait ResultExt {

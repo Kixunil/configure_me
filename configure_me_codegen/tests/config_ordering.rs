@@ -31,23 +31,23 @@ fn config_ordering() {
     let fortyseven = this.join("fortyseven.toml");
     let empty_args: &[&str] = &[];
 
-    let (config, _) = config::Config::including_optional_config_files(&[&empty, &empty]).unwrap();
+    let (config, _, _) = config::Config::including_optional_config_files(&[&empty, &empty]).unwrap();
     assert!(config.foo.is_none());
-    let (config, _) = config::Config::including_optional_config_files(&[&empty, &fortytwo]).unwrap();
+    let (config, _, _) = config::Config::including_optional_config_files(&[&empty, &fortytwo]).unwrap();
     assert_eq!(config.foo, Some(42));
-    let (config, _) = config::Config::including_optional_config_files(&[&fortytwo, &empty]).unwrap();
+    let (config, _, _) = config::Config::including_optional_config_files(&[&fortytwo, &empty]).unwrap();
     assert_eq!(config.foo, Some(42));
-    let (config, _) = config::Config::including_optional_config_files(&[&fortytwo, &fortytwo]).unwrap();
+    let (config, _, _) = config::Config::including_optional_config_files(&[&fortytwo, &fortytwo]).unwrap();
     assert_eq!(config.foo, Some(42));
-    let (config, _) = config::Config::including_optional_config_files(&[&fortytwo, &fortyseven]).unwrap();
+    let (config, _, _) = config::Config::including_optional_config_files(&[&fortytwo, &fortyseven]).unwrap();
     assert_eq!(config.foo, Some(42));
-    let (config, _) = config::Config::including_optional_config_files(&[&fortyseven, &fortytwo]).unwrap();
+    let (config, _, _) = config::Config::including_optional_config_files(&[&fortyseven, &fortytwo]).unwrap();
     assert_eq!(config.foo, Some(47));
 
-    let (config, _) = config::Config::custom_args_and_optional_files(&["test", "--foo=42"], empty_args).unwrap();
+    let (config, _, _) = config::Config::custom_args_and_optional_files(&["test", "--foo=42"], empty_args).unwrap();
     assert_eq!(config.foo, Some(42));
-    let (config, _) = config::Config::custom_args_and_optional_files(&["test", "--foo=42"], &[&fortyseven]).unwrap();
+    let (config, _, _) = config::Config::custom_args_and_optional_files(&["test", "--foo=42"], &[&fortyseven]).unwrap();
     assert_eq!(config.foo, Some(42));
-    let (config, _) = config::Config::custom_args_and_optional_files(&["test".as_ref(), "--foo=50".as_ref(), "--config".as_ref(), fortytwo.as_path()], &[&fortyseven]).unwrap();
+    let (config, _, _) = config::Config::custom_args_and_optional_files(&["test".as_ref(), "--foo=50".as_ref(), "--config".as_ref(), fortytwo.as_path()], &[&fortyseven]).unwrap();
     assert_eq!(config.foo, Some(42));
 }

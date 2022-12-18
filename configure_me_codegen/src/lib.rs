@@ -715,6 +715,8 @@ merge_fn = "(|a: &mut String, b: String| a.push_str(&b))"
             out_temp.write_all(&out).unwrap();
 
             std::process::Command::new("diff")
+                .arg("-C")
+                .arg("5")
                 .arg(expected_temp.path())
                 .arg(out_temp.path())
                 .spawn()
