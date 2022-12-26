@@ -668,6 +668,7 @@ fn gen_merge_args<W: Write>(config: &Config, mut output: W) -> fmt::Result {
 }
 
 pub fn generate_code<W: Write>(config: &Config, mut output: W) -> fmt::Result {
+    let has_mandatory = config.params.iter().any(|param| if let Optionality::Mandatory = param.optionality { true } else { false });
     writeln!(output, "pub mod prelude {{")?;
     writeln!(output, "    pub use super::{{Config, ResultExt}};")?;
     writeln!(output, "}}")?;
@@ -719,8 +720,9 @@ pub fn generate_code<W: Write>(config: &Config, mut output: W) -> fmt::Result {
     writeln!(output, "}}")?;
     writeln!(output)?;
     writeln!(output, "pub enum ValidationError {{")?;
-    writeln!(output, "    #[allow(unused)]")?;
-    writeln!(output, "    MissingField(&'static str),")?;
+    if has_mandatory {
+        writeln!(output, "    MissingField(&'static str),")?;
+    }
     if let ProgramName::Required = config.general.program_name {
         writeln!(output, "    MissingProgramName,")?;
     }
@@ -729,8 +731,10 @@ pub fn generate_code<W: Write>(config: &Config, mut output: W) -> fmt::Result {
     writeln!(output, "#[automatically_derived]")?;
     writeln!(output, "impl ::std::fmt::Display for ValidationError {{")?;
     writeln!(output, "    fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {{")?;
-    writeln!(output, "        match self {{")?;
-    writeln!(output, "            ValidationError::MissingField(field) => write!(f, \"Configuration parameter '{{}}' not specified.\", field),")?;
+    writeln!(output, "        match *self {{")?;
+    if has_mandatory {
+        writeln!(output, "            ValidationError::MissingField(field) => write!(f, \"Configuration parameter '{{}}' not specified.\", field),")?;
+    }
     if let ProgramName::Required = config.general.program_name {
         writeln!(output, "            ValidationError::MissingProgramName => write!(f, \"Missing program name (the zeroth argument)\"),")?;
     }

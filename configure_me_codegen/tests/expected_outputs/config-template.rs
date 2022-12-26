@@ -49,16 +49,13 @@ impl ::std::fmt::Debug for EnvParseError {
 }
 
 pub enum ValidationError {
-    #[allow(unused)]
-    MissingField(&'static str),
 <<"validation_error.rs">>
 }
 
 #[automatically_derived]
 impl ::std::fmt::Display for ValidationError {
     fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
-        match self {
-            ValidationError::MissingField(field) => write!(f, "Configuration parameter '{}' not specified.", field),
+        match *self {
 <<"display_validation_error.rs">>
         }
     }
