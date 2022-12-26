@@ -27,7 +27,8 @@ impl ValidationError {
             InvalidField { kind: InvalidAbbr { abbr_span }, .. } => abbr_span.start,
             InvalidField { kind: ReservedParameter, span, .. } => span.start,
             Duplicates { duplicate_spans, .. } => duplicate_spans[0].start, // always non-empty
-            InvalidIdentifier(error) => error.span().start
+            InvalidIdentifier(error) => error.span().start,
+            InvalidProgramName { span, .. } => span.start,
         }
     }
 }
@@ -37,6 +38,7 @@ enum ValidationErrorSource {
     InvalidField { name: String, span: Span, kind: FieldError },
     Duplicates { name: String, first_span: Span, duplicate_spans: Vec<Span> },
     InvalidIdentifier(ident::Error),
+    InvalidProgramName { input: String, span: Span }
 }
 
 impl From<ident::Error> for ValidationError {
@@ -65,6 +67,7 @@ impl fmt::Display for ValidationError {
             // first span is stored separately so we have to add 1
             Duplicates { name, duplicate_spans, .. } => write!(f, "the option {} occurs {} times", name, duplicate_spans.len() + 1),
             InvalidIdentifier(error) => fmt::Display::fmt(error, f),
+            InvalidProgramName { input, .. } => write!(f, "the string `{}` is not a valid program name handling strategy", input),
         }
     }
 }
@@ -146,6 +149,14 @@ impl ValidationError {
                     .with_labels(labels)
             },
             ValidationErrorSource::InvalidIdentifier(error) => error.to_diagnostic(file_id),
+            ValidationErrorSource::InvalidProgramName { input, span } => {
+                let labels = vec![Label::primary(file_id, *span).with_message("this is an invalid program name handling strategy")];
+                diagnostic.with_message(format!("`{}` is not a valid program name handling strategy", input))
+                    .with_labels(labels)
+                    .with_notes(vec![
+                        "Help: valid program name handling strategies are `unused`, `optional`, `required`.".to_owned()
+                    ])
+            },
         }
     }
 }
@@ -590,6 +601,8 @@ pub mod raw {
 
     impl Config {
         pub fn validate(self) -> Result<super::Config, Vec<ValidationError>> {
+            use super::ProgramName;
+
             let default_optional = self.defaults.optional;
             let default_argument = self.defaults.args;
             let default_env_var = self.defaults.env_vars.unwrap_or(self.general.env_prefix.is_some());
@@ -636,6 +649,22 @@ pub mod raw {
             let conf_dir_param = to_ident(self.general.conf_dir_param);
             let skip_default_conf_files_switch = to_ident(self.general.skip_default_conf_files_switch);
 
+            let program_name = self.general.program_name.map(|program_name| {
+                let span = Span::from(&program_name);
+                let program_name = program_name.into_inner();
+                match &*program_name {
+                    "unused" => ProgramName::Unused,
+                    "optional" => ProgramName::Optional,
+                    "required" => ProgramName::Required,
+                    _ => {
+                        let error = ValidationError {
+                            source: ValidationErrorSource::InvalidProgramName { input: program_name, span },
+                        };
+                        errors.push(error);
+                        ProgramName::Unused
+                    }
+                }
+            }).unwrap_or_default();
             if !errors.is_empty() {
                 errors.sort_by_key(ValidationError::sort_key);
                 return Err(errors);
@@ -649,7 +678,7 @@ pub mod raw {
                 conf_file_param,
                 conf_dir_param,
                 skip_default_conf_files_switch,
-                require_program_name: self.general.require_program_name,
+                program_name,
             };
 
             Ok(super::Config {
@@ -674,8 +703,7 @@ pub mod raw {
         conf_file_param: Option<Spanned<String>>,
         conf_dir_param: Option<Spanned<String>>,
         skip_default_conf_files_switch: Option<Spanned<String>>,
-        #[serde(default)]
-        require_program_name: bool,
+        program_name: Option<Spanned<String>>,
     }
 
 
@@ -861,11 +889,14 @@ pub struct General {
     /// configuration files.
     pub skip_default_conf_files_switch: Option<Ident>,
 
-    /// Whether the program name, the zeroth argument, is required.
+    /// How to handle the zeroth argument - program name.
     ///
-    /// If the program name is required this will change the type from `Option<PathBuf>` to
-    /// `PathBuf` and report nice error out-of-the-box.
-    pub require_program_name: bool,
+    /// If the program name is unused it will not be added to the `Metadata` struct.
+    /// If the program name is optional the field `program_name: Option<PathBuf>` is
+    /// added to `Metadata` struct.
+    /// If the program name is required `PathBuf` is added to `Metadata` and a nice error message
+    /// will be reported if it is missing.
+    pub program_name: ProgramName,
 }
 
 #[derive(Debug)]
@@ -940,4 +971,17 @@ impl Switch {
         }
     }
 
+}
+
+#[derive(Debug)]
+pub enum ProgramName {
+    Unused,
+    Optional,
+    Required,
+}
+
+impl Default for ProgramName {
+    fn default() -> Self {
+        ProgramName::Unused
+    }
 }

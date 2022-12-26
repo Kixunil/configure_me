@@ -638,6 +638,18 @@ type = "String"
 merge_fn = "(|a: &mut String, b: String| a.push_str(&b))"
 "#;
 
+    pub const OPTIONAL_PROGRAM_NAME: &str =
+r#"
+[general]
+program_name = "optional"
+"#;
+
+    pub const REQUIRED_PROGRAM_NAME: &str =
+r#"
+[general]
+program_name = "required"
+"#;
+
     pub struct ExpectedOutput {
         pub raw_config: &'static str,
         pub validate: &'static str,
@@ -775,5 +787,15 @@ merge_fn = "(|a: &mut String, b: String| a.push_str(&b))"
     #[test]
     fn custom_merge_fn() {
         check(CUSTOM_MERGE_FN, include_str!(concat!(env!("OUT_DIR"), "/expected_outputs/with_custom_merge-config.rs")));
+    }
+
+    #[test]
+    fn optional_program_name() {
+        check(OPTIONAL_PROGRAM_NAME, include_str!(concat!(env!("OUT_DIR"), "/expected_outputs/optional_program_name-config.rs")));
+    }
+
+    #[test]
+    fn required_program_name() {
+        check(REQUIRED_PROGRAM_NAME, include_str!(concat!(env!("OUT_DIR"), "/expected_outputs/required_program_name-config.rs")));
     }
 }

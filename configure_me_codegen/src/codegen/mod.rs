@@ -1,5 +1,5 @@
 use std::fmt::{self, Write};
-use ::config::{Config, Optionality};
+use ::config::{Config, Optionality, ProgramName};
 use ::unicode_segmentation::UnicodeSegmentation;
 
 mod visitor {
@@ -721,6 +721,9 @@ pub fn generate_code<W: Write>(config: &Config, mut output: W) -> fmt::Result {
     writeln!(output, "pub enum ValidationError {{")?;
     writeln!(output, "    #[allow(unused)]")?;
     writeln!(output, "    MissingField(&'static str),")?;
+    if let ProgramName::Required = config.general.program_name {
+        writeln!(output, "    MissingProgramName,")?;
+    }
     writeln!(output, "}}")?;
     writeln!(output)?;
     writeln!(output, "#[automatically_derived]")?;
@@ -728,6 +731,9 @@ pub fn generate_code<W: Write>(config: &Config, mut output: W) -> fmt::Result {
     writeln!(output, "    fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {{")?;
     writeln!(output, "        match self {{")?;
     writeln!(output, "            ValidationError::MissingField(field) => write!(f, \"Configuration parameter '{{}}' not specified.\", field),")?;
+    if let ProgramName::Required = config.general.program_name {
+        writeln!(output, "            ValidationError::MissingProgramName => write!(f, \"Missing program name (the zeroth argument)\"),")?;
+    }
     writeln!(output, "        }}")?;
     writeln!(output, "    }}")?;
     writeln!(output, "}}")?;
@@ -877,6 +883,11 @@ pub fn generate_code<W: Write>(config: &Config, mut output: W) -> fmt::Result {
     writeln!(output, "        let mut args_config = raw::Config::default();")?;
     writeln!(output, "        let mut skip_default_conf_files = false;")?;
     writeln!(output, "        let (program_name, remaining_args) = args_config.merge_args(args.into_iter().map(Into::into), &mut skip_default_conf_files)?;")?;
+    match config.general.program_name {
+        ProgramName::Unused => writeln!(output, "        let _ = program_name;")?,
+        ProgramName::Optional => (),
+        ProgramName::Required => writeln!(output, "        let program_name = program_name.ok_or(ValidationError::MissingProgramName)?;")?,
+    }
     writeln!(output)?;
     writeln!(output, "        let mut config = raw::Config::default();")?;
     writeln!(output)?;
@@ -897,7 +908,10 @@ pub fn generate_code<W: Write>(config: &Config, mut output: W) -> fmt::Result {
     writeln!(output, "        config.merge_in(args_config);")?;
     writeln!(output)?;
     writeln!(output, "        let metadata = Metadata {{")?;
-    writeln!(output, "            program_name,")?;
+    match config.general.program_name {
+        ProgramName::Unused => (),
+        ProgramName::Optional | ProgramName::Required => writeln!(output, "            program_name,")?,
+    }
     writeln!(output, "        }};")?;
     writeln!(output)?;
     writeln!(output, "        config")?;
@@ -913,7 +927,11 @@ pub fn generate_code<W: Write>(config: &Config, mut output: W) -> fmt::Result {
     writeln!(output, "/// Currently it only contains program name but more items could be available in the future.")?;
     writeln!(output, "#[non_exhaustive]")?;
     writeln!(output, "pub struct Metadata {{")?;
-    writeln!(output, "    pub program_name: Option<std::path::PathBuf>,")?;
+    match config.general.program_name {
+        ProgramName::Unused => (),
+        ProgramName::Optional => writeln!(output, "    pub program_name: Option<std::path::PathBuf>,")?,
+        ProgramName::Required => writeln!(output, "    pub program_name: std::path::PathBuf,")?,
+    }
     writeln!(output, "}}")?;
     writeln!(output)?;
     writeln!(output, "pub trait ResultExt {{")?;

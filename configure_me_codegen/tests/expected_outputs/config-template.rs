@@ -51,6 +51,7 @@ impl ::std::fmt::Debug for EnvParseError {
 pub enum ValidationError {
     #[allow(unused)]
     MissingField(&'static str),
+<<"validation_error.rs">>
 }
 
 #[automatically_derived]
@@ -58,6 +59,7 @@ impl ::std::fmt::Display for ValidationError {
     fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
         match self {
             ValidationError::MissingField(field) => write!(f, "Configuration parameter '{}' not specified.", field),
+<<"display_validation_error.rs">>
         }
     }
 }
@@ -204,6 +206,7 @@ impl Config {
         let mut args_config = raw::Config::default();
         let mut skip_default_conf_files = false;
         let (program_name, remaining_args) = args_config.merge_args(args.into_iter().map(Into::into), &mut skip_default_conf_files)?;
+<<"process_program_name.rs">>
 
         let mut config = raw::Config::default();
 
@@ -224,7 +227,7 @@ impl Config {
         config.merge_in(args_config);
 
         let metadata = Metadata {
-            program_name,
+<<"construct_metadata.rs">>
         };
 
         config
@@ -240,7 +243,7 @@ impl Config {
 /// Currently it only contains program name but more items could be available in the future.
 #[non_exhaustive]
 pub struct Metadata {
-    pub program_name: Option<std::path::PathBuf>,
+<<"metadata_fields.rs">>
 }
 
 pub trait ResultExt {

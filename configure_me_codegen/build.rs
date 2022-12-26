@@ -27,7 +27,7 @@ fn main() {
     let out_dir_expected_outputs = out_dir.join("expected_outputs");
     std::fs::create_dir_all(&out_dir_expected_outputs).unwrap();
 
-    let tests = ["empty", "single_optional_param", "single_mandatory_param", "single_default_param", "single_switch", "multiple_params", "no_arg", "short_switches", "conf_files", "with_custom_merge"];
+    let tests = ["empty", "single_optional_param", "single_mandatory_param", "single_default_param", "single_switch", "multiple_params", "no_arg", "short_switches", "conf_files", "with_custom_merge", "optional_program_name", "required_program_name"];
 
     for test in &tests {
         process_template(test, &out_dir_expected_outputs);
