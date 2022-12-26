@@ -754,6 +754,7 @@ pub mod raw {
             let ty = self.1.ty;
             let argument = self.1.argument.unwrap_or(default_argument);
             let env_var = self.1.env_var.unwrap_or(default_env_var);
+            let needs_conversion = self.1.convert_into.is_some();
             let convert_into = self.1.convert_into.unwrap_or_else(|| ty.clone());
 
             Ok(super::Param {
@@ -765,6 +766,7 @@ pub mod raw {
                 argument,
                 env_var,
                 convert_into,
+                needs_conversion,
                 merge_fn: self.1.merge_fn,
                 #[cfg(feature = "debconf")]
                 debconf_priority: self.1.debconf_priority,
@@ -942,6 +944,7 @@ pub struct Param {
     pub argument: bool,
     pub env_var: bool,
     pub convert_into: String,
+    pub needs_conversion: bool,
     pub merge_fn: Option<String>,
     #[cfg(feature = "debconf")]
     pub debconf_priority: Option<::debconf::Priority>,

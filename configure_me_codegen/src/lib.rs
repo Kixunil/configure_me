@@ -575,6 +575,28 @@ default = true
 doc = "Determines whether to mine bitcoins fast or slowly"
 "#;
 
+    pub const CONVERT_INTO: &str =
+r#"
+[general]
+env_prefix = "TEST_APP"
+
+[param.foo]
+type = "u32"
+default = "42"
+doc = "A foo"
+
+[param.bar]
+type = "String"
+optional = true
+doc = "A very, very, very, very, very, very, very, very, very, very, very, very, very, very long documentation..."
+convert_into = "std::ffi::OsString"
+
+[param.baz]
+type = "String"
+optional = false
+doc = "A much, much, much, much, much, much, much, much, much, much, much, much, much, much, much, much, much, much, much, much, much, much, much, much, much, much, much, much, much, much, much, much, much, much, much, much, much, much, much, much, much, much longer documentation..."
+convert_into = "std::ffi::OsString"
+"#;
     pub const NO_ARG: &str =
 r#"
 [general]
@@ -767,6 +789,11 @@ program_name = "required"
     #[test]
     fn multiple_params() {
         check(MULTIPLE_PARAMS, include_str!(concat!(env!("OUT_DIR"), "/expected_outputs/multiple_params-config.rs")));
+    }
+
+    #[test]
+    fn convert_into() {
+        check(CONVERT_INTO, include_str!(concat!(env!("OUT_DIR"), "/expected_outputs/convert_into-config.rs")));
     }
 
     #[test]

@@ -4,8 +4,6 @@
 
             Ok(super::Config {
                 foo,
-                bar,
-                baz,
-                verbose: self.verbose.unwrap_or(false),
-                fast: self.fast.unwrap_or(true),
+                bar: bar.map(Into::into),
+                baz: baz.into(),
             })

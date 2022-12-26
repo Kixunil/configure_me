@@ -136,10 +136,14 @@ empty!(::config::Switch, Validate);
 
 impl VisitWrite<visitor::ConstructConfig> for ::config::Param {
     fn visit_write<W: fmt::Write>(&self, mut output: W) -> fmt::Result {
-        if let Optionality::Optional = self.optionality {
-            writeln!(output, "                {}: {}.map(Into::into),", self.name.as_snake_case(), self.name.as_snake_case())
+        if self.needs_conversion {
+            if let Optionality::Optional = self.optionality {
+                writeln!(output, "                {}: {}.map(Into::into),", self.name.as_snake_case(), self.name.as_snake_case())
+            } else {
+                writeln!(output, "                {}: {}.into(),", self.name.as_snake_case(), self.name.as_snake_case())
+            }
         } else {
-            writeln!(output, "                {}: {}.into(),", self.name.as_snake_case(), self.name.as_snake_case())
+                writeln!(output, "                {},", self.name.as_snake_case())
         }
     }
 }
