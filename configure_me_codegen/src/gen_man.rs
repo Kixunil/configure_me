@@ -12,13 +12,13 @@ fn generate_meta(config: &Config, manifest: &Manifest) -> Result<Manual, manifes
 
     let man = if let Some(summary) = &config.general.summary {
         man.about(&**summary)
-    } else if let Some(summary) = &package.description {
+    } else if let Some(summary) = &package.description() {
         man.about(&**summary)
     } else {
         man
     };
 
-    let authors = &package.authors;
+    let authors = &package.authors();
     Ok(authors.iter().fold(man, |man, author| {
         let mut name_email = author.split('<');
         if let Some(name) = name_email.next() {
