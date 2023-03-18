@@ -33,6 +33,7 @@ impl ValidationError {
     }
 }
 
+#[cfg_attr(not(feature = "spanned"), allow(unused))]
 #[derive(Debug)]
 enum ValidationErrorSource {
     InvalidField { name: String, span: Span, kind: FieldError },

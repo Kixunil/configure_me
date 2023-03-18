@@ -71,6 +71,7 @@ enum ErrorData {
 
 #[derive(Debug)]
 struct InputError {
+    #[cfg_attr(not(feature = "spanned"), allow(unused))]
     file: FileSpec,
     source: InputErrorSource,
 }
