@@ -489,7 +489,6 @@ pub mod raw {
     pub trait IntoParts: Sized {
         type Value;
 
-        fn into_parts(self) -> (Self::Value, Span);
         fn to_span(&self) -> Span;
         fn get(&self) -> Self::Value where Self::Value: Copy;
 
@@ -500,11 +499,6 @@ pub mod raw {
 
     impl<T> IntoParts for Spanned<T> {
         type Value = T;
-
-        fn into_parts(self) -> (Self::Value, Span) {
-            let span = Span::from(&self);
-            (self.into_inner(), span)
-        }
 
         fn to_span(&self) -> Span {
             Span::from(self)
@@ -598,7 +592,6 @@ pub mod raw {
 
             Ok(super::Config {
                 general,
-                defaults: self.defaults,
                 params,
                 switches,
                 #[cfg(feature = "debconf")]
@@ -762,7 +755,6 @@ pub struct Config {
     pub general: General,
     #[cfg(feature = "debconf")]
     pub debconf: Option<::debconf::DebConfig>,
-    pub defaults: Defaults,
     pub params: Vec<Param>,
     pub switches: Vec<Switch>,
 }
