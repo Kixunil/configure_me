@@ -658,6 +658,7 @@ type = "String"
 merge_fn = "(|a: &mut String, b: String| a.push_str(&b))"
 "#;
 
+    #[allow(unused)]
     pub struct ExpectedOutput {
         pub raw_config: &'static str,
         pub validate: &'static str,
