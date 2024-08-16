@@ -13,5 +13,5 @@ license = "MITNFA"
 [dependencies]
 serde = "1"
 serde_derive = "1.0.90"
-toml = "0.5.0"
+toml = "0.5.11"
 parse_arg = "0.1.3"

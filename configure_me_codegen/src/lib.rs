@@ -673,6 +673,7 @@ r#"
 program_name = "required"
 "#;
 
+    #[allow(unused)]
     pub struct ExpectedOutput {
         pub raw_config: &'static str,
         pub validate: &'static str,
