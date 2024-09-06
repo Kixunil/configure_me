@@ -309,12 +309,11 @@ impl From<manifest::LoadError> for Error {
     }
 }
 
-impl From<void::Void> for Error {
-    fn from(value: void::Void) -> Self {
+impl From<std::convert::Infallible> for Error {
+    fn from(value: std::convert::Infallible) -> Self {
         match value {}
     }
 }
-
 
 #[cfg(feature = "debconf")]
 impl From<debconf::Error> for Error {

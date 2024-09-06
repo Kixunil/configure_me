@@ -24,7 +24,6 @@ toml = "0.5.4"
 cargo_toml = ">= 0.12.4, < 0.21.0"
 unicode-segmentation = "1.2"
 fmt2io = "1.0.0"
-void = "1"
 # Generally, you shouldn't turn this on and instead use `cfg_me` tool to generate man pages.
 man = { version = "0.1.1", optional = true }
 # This feature is not public! Do not depend on it, depend on `spanned` instead!

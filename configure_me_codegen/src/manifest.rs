@@ -98,7 +98,7 @@ pub trait LoadManifest: sealed::LoadManifest {
 }
 
 impl LoadManifest for Manifest {
-    type Error = void::Void;
+    type Error = std::convert::Infallible;
     type Manifest = Self;
 
     fn load_manifest(self) -> Result<Self::Manifest, Self::Error> {
@@ -107,7 +107,7 @@ impl LoadManifest for Manifest {
 }
 
 impl<'a> LoadManifest for &'a Manifest {
-    type Error = void::Void;
+    type Error = std::convert::Infallible;
     type Manifest = Self;
 
     fn load_manifest(self) -> Result<Self::Manifest, Self::Error> {
