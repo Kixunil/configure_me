@@ -576,6 +576,32 @@ pub mod raw {
         }
     }
 
+    fn make_true() -> bool {
+        true
+    }
+
+    #[derive(Debug)]
+    #[derive(Deserialize)]
+    #[serde(deny_unknown_fields)]
+    pub struct Defaults {
+        #[serde(default = "make_true")]
+        pub args: bool,
+        #[serde(default)]
+        pub env_vars: Option<bool>,
+        #[serde(default = "make_true")]
+        pub optional: bool,
+    }
+
+    impl Default for Defaults {
+        fn default() -> Self {
+            Defaults {
+                args: true,
+                env_vars: None,
+                optional: true,
+            }
+        }
+    }
+
     #[derive(Debug)]
     #[derive(Deserialize)]
     #[serde(deny_unknown_fields)]
@@ -589,7 +615,7 @@ pub mod raw {
         #[serde(default)]
         general: General,
         #[serde(default)]
-        defaults: super::Defaults,
+        defaults: Defaults,
         #[cfg(feature = "debconf")]
         debconf: Option<::debconf::DebConfig>,
     }
@@ -838,10 +864,6 @@ pub mod raw {
     }
 }
 
-fn make_true() -> bool {
-    true
-}
-
 pub struct Config {
     pub general: General,
     #[cfg(feature = "debconf")]
@@ -892,28 +914,6 @@ pub struct General {
     /// If the program name is required `PathBuf` is added to `Metadata` and a nice error message
     /// will be reported if it is missing.
     pub program_name: ProgramName,
-}
-
-#[derive(Debug)]
-#[derive(Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct Defaults {
-    #[serde(default = "make_true")]
-    pub args: bool,
-    #[serde(default)]
-    pub env_vars: Option<bool>,
-    #[serde(default = "make_true")]
-    pub optional: bool,
-}
-
-impl Default for Defaults {
-    fn default() -> Self {
-        Defaults {
-            args: true,
-            env_vars: None,
-            optional: true,
-        }
-    }
 }
 
 pub enum Optionality {
