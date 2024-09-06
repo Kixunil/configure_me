@@ -443,7 +443,6 @@ pub fn build_script_auto() -> Result<(), Error> {
             }
             Ok(())
         },
-        SpecificationPaths::Other(other) => match other._private {},
     }
 }
 

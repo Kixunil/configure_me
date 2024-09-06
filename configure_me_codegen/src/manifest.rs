@@ -5,38 +5,25 @@ use std::collections::HashMap;
 /// Cargo manifest as understood by this crate
 pub type Manifest = cargo_toml::Manifest<Metadata>;
 
-/// This is a placeholder for future extensions of the crate.
-///
-/// It does nothing currently and can't be constructed.
-/// You may match on it using `_`
-pub struct OtherPaths {
-    // This is currently never constructed, so we hint it to the compiler
-    // In the future, if we add another variant, we can easily use semver trick
-    // To keep everything backwards-compatible
-    pub(crate) _private: void::Void,
-}
-
 /// Paths to specification files
 #[derive(Deserialize)]
+#[non_exhaustive]
 pub enum SpecificationPaths {
     #[serde(rename = "spec")]
     Single(PathBuf),
     #[serde(rename = "bin")]
     PerBinary(HashMap<String, PathBuf>),
-    #[serde(skip)]
-    Other(OtherPaths),
 }
 
 /// Metadata of this crate
 #[derive(Deserialize)]
+#[non_exhaustive]
 pub struct ConfigureMeMetadata {
     /// Path to the specification
     ///
     /// Must be relative to Cargo.toml directory
     #[serde(flatten)]
     pub spec_paths: SpecificationPaths,
-    #[serde(skip)]
-    _private: (),
 }
 
 /// Metadata used in manifest
@@ -67,26 +54,13 @@ impl fmt::Display for LoadError {
     }
 }
 
-
-/// This is a placeholder for future extensions of the crate.
-///
-/// It does nothing currently and can't be constructed.
-/// You may match on it using `_`
 #[derive(Debug)]
-pub struct OtherError {
-    // This is currently never constructed, so we hint it to the compiler
-    // In the future, if we add another variant, we can easily use semver trick
-    // To keep everything backwards-compatible
-    pub(crate) _private: void::Void,
-}
-
-#[derive(Debug)]
+#[non_exhaustive]
 pub enum Error {
     Load(LoadError),
     MissingPackage,
     MissingMetadata,
     MissingConfigureMeMetadata,
-    Other(OtherError),
 }
 
 impl fmt::Display for Error {
@@ -96,7 +70,6 @@ impl fmt::Display for Error {
             Error::MissingPackage => write!(f, "The manifest is missing package section"),
             Error::MissingMetadata => write!(f, "The manifest is missing metadata section"),
             Error::MissingConfigureMeMetadata => write!(f, "The manifest is missing metadata.configure_me section"),
-            Error::Other(other) => match other._private {},
         }
     }
 }
