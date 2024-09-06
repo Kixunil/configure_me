@@ -152,19 +152,6 @@ impl<'a> LoadManifest for &'a PathBuf {
     }
 }
 
-pub(crate) struct BuildScript;
-
-impl LoadManifest for BuildScript {
-    type Error = super::Error;
-    type Manifest = Manifest;
-
-    fn load_manifest(self) -> Result<Self::Manifest, Self::Error> {
-        let manifest_dir = get_dir()?;
-        let manifest_file = manifest_dir.join("Cargo.toml");
-        manifest_file.load_manifest().map_err(Into::into)
-    }
-}
-
 impl LoadManifest for CurrentDir {
     type Error = LoadError;
     type Manifest = Manifest;
@@ -191,7 +178,7 @@ macro_rules! impl_load_manifest_ref {
     }
 }
 
-impl_load_manifest!(Manifest, PathBuf, BuildScript, CurrentDir);
+impl_load_manifest!(Manifest, PathBuf, CurrentDir);
 impl_load_manifest_ref!(Manifest, PathBuf, Path);
 
 pub (crate) fn get_dir() -> Result<PathBuf, super::Error> {

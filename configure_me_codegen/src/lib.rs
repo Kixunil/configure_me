@@ -45,6 +45,7 @@ pub (crate) mod debconf;
 
 pub mod manifest;
 
+#[cfg(feature = "man")]
 use std::borrow::Borrow;
 use std::fmt;
 use std::io::{self, Read, Write};
@@ -451,45 +452,6 @@ pub fn metabuild() {
         println!("Could not generate configuration parser: {}", error);
         std::process::exit(1)
     })
-}
-
-/// Generates the source code and manual page at default location.
-///
-/// This function is deprecated because generating man page in compilation step is surprising. An
-/// external `cfg_me` tool is provided that can generate the man page and save it to predictable
-/// location. This function uses `OUT_DIR` which is a weird place to put man page (and there's no
-/// better).
-///
-/// This is same as `build_script()`, but additionaly it generates a man page.
-/// The resulting man page will be stored in `$OUT_DIR/app.man`.
-#[cfg(feature = "man")]
-#[deprecated = "use of cfg_me crate to build man pages is cleaner"]
-pub fn build_script_with_man<P: AsRef<Path>>(source: P) -> Result<(), Error> {
-    #[allow(deprecated)]
-    build_script_with_man_written_to(source, path_in_out_dir("app.man")?)
-}
-
-/// Generates the source code and manual page at specified location.
-///
-/// This function is deprecated because generating man page in compilation step is surprising. An
-/// external `cfg_me` tool is provided that can generate the man page and save it to predictable
-/// location. This function needlessly burdens users of the crate to handle location configuration
-/// and makes it hard for toold like packagers to read the man page.
-///
-/// This is same as `build_script_with_man()`, but it allows you to choose where to put the man
-/// page.
-#[cfg(feature = "man")]
-#[deprecated = "use of cfg_me crate to build man pages is cleaner"]
-pub fn build_script_with_man_written_to<P: AsRef<Path>, M: AsRef<Path> + Into<PathBuf>>(source: P, output: M) -> Result<(), Error> {
-    let config_spec = load_and_generate_default(source, None)?;
-    let manifest = manifest::BuildScript.load_manifest()?;
-    let man_page = gen_man::generate_man_page(&config_spec, manifest.borrow())?;
-
-    let mut file = create_file(output)?;
-    file.write_all(man_page.as_bytes())?;
-    #[cfg(feature = "debconf")]
-    debconf::generate_if_requested(&config_spec)?;
-    Ok(())
 }
 
 /// Generates man page **only**.

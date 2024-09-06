@@ -251,6 +251,24 @@ mod ident {
         pub(crate) fn as_pascal_case(&self) -> PascalCase<'_> {
             PascalCase(&self.0)
         }
+
+        #[cfg(feature = "man")]
+        pub(crate) fn to_long_option(&self) -> String {
+            let mut res = String::with_capacity(self.0.len() + 2);
+            res.push_str("--");
+            // Writing to String never fails
+            write!(res, "{}", self.as_hypenated()).unwrap();
+            res
+        }
+
+        #[cfg(feature = "man")]
+        pub(crate) fn to_inverted_long_switch(&self) -> String {
+            let mut res = String::with_capacity(self.0.len() + 5);
+            res.push_str("--no-");
+            // Writing to String never fails
+            write!(res, "{}", self.as_hypenated()).unwrap();
+            res
+        }
     }
 
     pub(crate) struct UpperCase<'a>(&'a str);
@@ -690,10 +708,19 @@ pub mod raw {
                 errors.sort_by_key(ValidationError::sort_key);
                 return Err(errors);
             }
+            #[cfg(not(feature = "man"))]
+            {
+                let _ = self.general.name;
+                let _ = self.general.summary;
+                let _ = self.general.doc;
+            }
 
             let general = super::General {
+                #[cfg(feature = "man")]
                 name: self.general.name,
+                #[cfg(feature = "man")]
                 summary: self.general.summary,
+                #[cfg(feature = "man")]
                 doc: self.general.doc,
                 env_prefix: self.general.env_prefix,
                 conf_file_param,
@@ -875,12 +902,15 @@ pub struct Config {
 #[derive(Debug, Default)]
 pub struct General {
     /// Name of the program
+    #[cfg(feature = "man")]
     pub name: Option<String>,
 
     /// Short description of the program
+    #[cfg(feature = "man")]
     pub summary: Option<String>,
 
     /// Long description of the program
+    #[cfg(feature = "man")]
     pub doc: Option<String>,
 
     /// Prefix for all env vars - enables
