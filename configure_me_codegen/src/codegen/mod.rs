@@ -792,8 +792,8 @@ pub fn generate_code<W: Write>(config: &Config, mut output: W) -> fmt::Result {
     writeln!(output, "    use ::std::path::PathBuf;")?;
     writeln!(output, "    use super::{{ArgParseError, ValidationError}};")?;
     writeln!(output)?;
-    writeln!(output, "    #[derive(Deserialize, Default)]")?;
-    writeln!(output, "    #[serde(crate = \"crate::configure_me::serde\")]")?;
+    writeln!(output, "    #[derive(::configure_me::Deserialize, Default)]")?;
+    writeln!(output, "    #[serde(crate = \"::configure_me::serde\")]")?;
     writeln!(output, "    pub struct Config {{")?;
     writeln!(output, "        _program_path: Option<PathBuf>,")?;
     gen_raw_config(config, &mut output)?;

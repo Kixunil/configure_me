@@ -122,8 +122,8 @@ mod raw {
     use ::std::path::PathBuf;
     use super::{ArgParseError, ValidationError};
 
-    #[derive(Deserialize, Default)]
-    #[serde(crate = "crate::configure_me::serde")]
+    #[derive(::configure_me::Deserialize, Default)]
+    #[serde(crate = "::configure_me::serde")]
     pub struct Config {
         _program_path: Option<PathBuf>,
 <<"raw_config.rs">>
