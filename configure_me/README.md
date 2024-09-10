@@ -78,7 +78,7 @@ spec = "config_spec.toml"
 configure_me = "0.4.0"
 
 [build-dependencies]
-configure_me_codegen = "0.4.0"
+configure_me_codegen = "0.4.7"
 ```
 
 And finally add appropriate incantations into `src/main.rs`:
