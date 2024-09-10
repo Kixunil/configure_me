@@ -778,8 +778,8 @@ pub fn generate_code<W: Write>(config: &Config, mut output: W) -> fmt::Result {
     writeln!(output, "mod raw {{")?;
     writeln!(output, "    use super::{{ArgParseError, ValidationError}};")?;
     writeln!(output)?;
-    writeln!(output, "    #[derive(Deserialize, Default)]")?;
-    writeln!(output, "    #[serde(crate = \"crate::configure_me::serde\")]")?;
+    writeln!(output, "    #[derive(::configure_me::Deserialize, Default)]")?;
+    writeln!(output, "    #[serde(crate = \"::configure_me::serde\")]")?;
     writeln!(output, "    pub struct Config {{")?;
     gen_raw_config(config, &mut output)?;
     writeln!(output, "    }}")?;

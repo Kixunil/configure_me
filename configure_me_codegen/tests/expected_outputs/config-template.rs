@@ -120,8 +120,8 @@ impl ::std::fmt::Debug for Error {
 mod raw {
     use super::{ArgParseError, ValidationError};
 
-    #[derive(Deserialize, Default)]
-    #[serde(crate = "crate::configure_me::serde")]
+    #[derive(::configure_me::Deserialize, Default)]
+    #[serde(crate = "::configure_me::serde")]
     pub struct Config {
 <<"raw_config.rs">>
     }

@@ -49,8 +49,6 @@
 //! Then, create a simple build script:
 //! 
 //! ```rust,ignore
-//! extern crate configure_me;
-//! 
 //! fn main() {
 //!     configure_me::build_script_auto().unwrap_or_exit();
 //! }
@@ -77,9 +75,6 @@
 //! And finally add appropriate incantiations into `src/main.rs`:
 //! 
 //! ```rust,ignore
-//! #[macro_use]
-//! extern crate configure_me;
-//! 
 //! include_config!();
 //! 
 //! fn main() {
