@@ -127,7 +127,10 @@ impl VisitWrite<visitor::Validate> for ::config::Param {
         match self.optionality {
             Optionality::Optional => writeln!(output, "            let {} = self.{};", self.name.as_snake_case(), self.name.as_snake_case()),
             Optionality::Mandatory => writeln!(output, "            let {} = self.{}.ok_or(ValidationError::MissingField(\"{}\"))?;", self.name.as_snake_case(), self.name.as_snake_case(), self.name.as_snake_case()),
-            Optionality::DefaultValue(ref val) => writeln!(output, "            let {} = self.{}.unwrap_or_else(|| {{ {} }});", self.name.as_snake_case(), self.name.as_snake_case(), val),
+            Optionality::DefaultValue(ref val) => {
+                writeln!(output, "            #[allow(clippy::unnecessary_lazy_evaluations)]")?;
+                writeln!(output, "            let {} = self.{}.unwrap_or_else(|| {{ {} }});", self.name.as_snake_case(), self.name.as_snake_case(), val)
+            },
         }
     }
 }
@@ -601,6 +604,7 @@ fn gen_display_env_parse_error<W: Write>(config: &Config, mut output: W) -> fmt:
 fn gen_validation_fn<W: Write>(config: &Config, mut output: W) -> fmt::Result {
     write_params_and_switches::<visitor::Validate, _>(config, &mut output)?;
     writeln!(output)?;
+    writeln!(output, "            #[allow(clippy::useless_conversion)]")?;
     writeln!(output, "            Ok(super::Config {{")?;
     write_params_and_switches::<visitor::ConstructConfig, _>(config, &mut output)?;
     writeln!(output, "            }})")?;
@@ -833,6 +837,7 @@ pub fn generate_code<W: Write>(config: &Config, mut output: W) -> fmt::Result {
     writeln!(output, "                    return Err(ArgParseError::HelpRequested(self._program_path.as_ref().unwrap().to_string_lossy().into()).into());")?;
     write_config::<visitor::MergeArgs, _>(config, &mut output)?;
     writeln!(output, "                }} else if let Some(mut shorts) = ::configure_me::parse_arg::iter_short(&arg) {{")?;
+    writeln!(output, "                    #[allow(clippy::never_loop)]")?;
     writeln!(output, "                    for short in &mut shorts {{")?;
     writeln!(output, "                        if short == 'h' {{")?;
     writeln!(output, "                            return Err(ArgParseError::HelpRequested(self._program_path.as_ref().unwrap().to_string_lossy().into()).into())")?;

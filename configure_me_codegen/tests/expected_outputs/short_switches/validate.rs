@@ -1,6 +1,7 @@
             let d = self.d;
             let e = self.e;
 
+            #[allow(clippy::useless_conversion)]
             Ok(super::Config {
                 d: d.map(Into::into),
                 e: e.map(Into::into),

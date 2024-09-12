@@ -160,6 +160,7 @@ mod raw {
                     return Err(ArgParseError::HelpRequested(self._program_path.as_ref().unwrap().to_string_lossy().into()).into());
 <<"merge_args.rs">>
                 } else if let Some(mut shorts) = ::configure_me::parse_arg::iter_short(&arg) {
+                    #[allow(clippy::never_loop)]
                     for short in &mut shorts {
                         if short == 'h' {
                             return Err(ArgParseError::HelpRequested(self._program_path.as_ref().unwrap().to_string_lossy().into()).into())
