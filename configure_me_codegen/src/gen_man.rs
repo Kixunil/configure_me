@@ -40,7 +40,7 @@ fn generate_meta(config: &Config, manifest: &Manifest) -> Result<Manual, manifes
 
 fn generate_conf_file_param(man: Manual, config: &Config) -> Manual {
     if let Some(conf_file_param) = &config.general.conf_file_param {
-        let opt = Opt::new("CONFIG_FILE").long(&::codegen::param_long_raw(conf_file_param.as_snake_case()));
+        let opt = Opt::new("CONFIG_FILE").long(&conf_file_param.to_long_option());
         let opt = opt.help("Loads configuration from the specified CONFIG_FILE.");
         man.option(opt)
     } else {
@@ -50,7 +50,7 @@ fn generate_conf_file_param(man: Manual, config: &Config) -> Manual {
 
 fn generate_conf_dir_param(man: Manual, config: &Config) -> Manual {
     if let Some(conf_dir_param) = &config.general.conf_dir_param {
-        let opt = Opt::new("CONFIG_DIR").long(&::codegen::param_long_raw(conf_dir_param.as_snake_case()));
+        let opt = Opt::new("CONFIG_DIR").long(&conf_dir_param.to_long_option());
         let opt = opt.help("Loads configuration from all files in the directory CONFIG_DIR.");
         man.option(opt)
     } else {
@@ -60,7 +60,7 @@ fn generate_conf_dir_param(man: Manual, config: &Config) -> Manual {
 
 fn generate_skip_default_conf_files_switch(man: Manual, config: &Config) -> Manual {
     if let Some(switch) = &config.general.skip_default_conf_files_switch {
-        let opt = Flag::new().long(&::codegen::param_long_raw(switch.as_snake_case()));
+        let opt = Flag::new().long(&switch.to_long_option());
         let opt = opt.help("Skip loading default configuration files.");
         man.flag(opt)
     } else {
@@ -73,7 +73,7 @@ fn generate_params(man: Manual, config: &Config) -> Manual {
         .params
         .iter()
         .filter(|param| param.argument).map(|param| {
-            let opt = Opt::new(&param.name.as_upper_case().to_string()).long(&::codegen::param_long(param));
+            let opt = Opt::new(&param.name.as_upper_case().to_string()).long(&param.name.to_long_option());
             let opt = if let Some(short) = ::codegen::param_short(param) {
                 opt.short(&short)
             } else {

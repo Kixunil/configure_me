@@ -295,33 +295,16 @@ impl VisitWrite<visitor::MergeShort> for ::config::Switch {
 
 empty!(::config::General, MergeShort);
 
-pub(crate) fn param_long_raw(param: &str) -> String {
-    let mut res = String::with_capacity(param.len() + 2);
-    res.push_str("--");
-                                            // Writing to String never fails
-    underscore_to_hypen(&mut res, &param).unwrap();
-
-    res
-}
-
-pub(crate) fn param_long(param: &::config::Param) -> String {
-    param_long_raw(&param.name.as_snake_case())
-}
-
+#[cfg(feature = "man")]
 pub(crate) fn switch_long(switch: &::config::Switch) -> String {
     if switch.is_inverted() {
-        let mut res = String::with_capacity(switch.name.as_snake_case().len() + 5);
-                                            // Writing to String never fails
-        write!(res, "--no-{}", switch.name.as_snake_case()).unwrap();
-        res
+        switch.name.to_long_option()
     } else {
-        let mut res = String::with_capacity(switch.name.as_snake_case().len() + 2);
-                                            // Writing to String never fails
-        write!(res, "--{}", switch.name.as_snake_case()).unwrap();
-        res
+        switch.name.to_inverted_long_switch()
     }
 }
 
+#[cfg(feature = "man")]
 pub(crate) fn param_short(param: &::config::Param) -> Option<String> {
     let abbr = param.abbr?;
     let mut res = String::with_capacity(2);
@@ -330,6 +313,7 @@ pub(crate) fn param_short(param: &::config::Param) -> Option<String> {
     Some(res)
 }
 
+#[cfg(feature = "man")]
 pub(crate) fn switch_short(switch: &::config::Switch) -> Option<String> {
     if let ::config::SwitchKind::Normal { abbr: Some(abbr), .. } = switch.kind {
         let mut res = String::with_capacity(2);
@@ -611,17 +595,6 @@ fn gen_validation_fn<W: Write>(config: &Config, mut output: W) -> fmt::Result {
     Ok(())
 }
 
-fn underscore_to_hypen<W: Write>(mut output: W, ident: &str) -> fmt::Result {
-    for c in ident.chars() {
-        if c == '_' {
-                write!(output, "-")?;
-        } else {
-                write!(output, "{}", c)?;
-        }
-    }
-    Ok(())
-}
-
 fn gen_merge_env<W: Write>(config: &Config, mut output: W) -> fmt::Result {
     for param in &config.params {
         if !param.env_var {
@@ -805,8 +778,8 @@ pub fn generate_code<W: Write>(config: &Config, mut output: W) -> fmt::Result {
     writeln!(output, "mod raw {{")?;
     writeln!(output, "    use super::{{ArgParseError, ValidationError}};")?;
     writeln!(output)?;
-    writeln!(output, "    #[derive(Deserialize, Default)]")?;
-    writeln!(output, "    #[serde(crate = \"crate::configure_me::serde\")]")?;
+    writeln!(output, "    #[derive(::configure_me::Deserialize, Default)]")?;
+    writeln!(output, "    #[serde(crate = \"::configure_me::serde\")]")?;
     writeln!(output, "    pub struct Config {{")?;
     gen_raw_config(config, &mut output)?;
     writeln!(output, "    }}")?;

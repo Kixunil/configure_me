@@ -251,6 +251,24 @@ mod ident {
         pub(crate) fn as_pascal_case(&self) -> PascalCase<'_> {
             PascalCase(&self.0)
         }
+
+        #[cfg(feature = "man")]
+        pub(crate) fn to_long_option(&self) -> String {
+            let mut res = String::with_capacity(self.0.len() + 2);
+            res.push_str("--");
+            // Writing to String never fails
+            write!(res, "{}", self.as_hypenated()).unwrap();
+            res
+        }
+
+        #[cfg(feature = "man")]
+        pub(crate) fn to_inverted_long_switch(&self) -> String {
+            let mut res = String::with_capacity(self.0.len() + 5);
+            res.push_str("--no-");
+            // Writing to String never fails
+            write!(res, "{}", self.as_hypenated()).unwrap();
+            res
+        }
     }
 
     pub(crate) struct UpperCase<'a>(&'a str);
@@ -556,7 +574,6 @@ pub mod raw {
     pub trait IntoParts: Sized {
         type Value;
 
-        fn into_parts(self) -> (Self::Value, Span);
         fn to_span(&self) -> Span;
         fn get(&self) -> Self::Value where Self::Value: Copy;
 
@@ -568,17 +585,38 @@ pub mod raw {
     impl<T> IntoParts for Spanned<T> {
         type Value = T;
 
-        fn into_parts(self) -> (Self::Value, Span) {
-            let span = Span::from(&self);
-            (self.into_inner(), span)
-        }
-
         fn to_span(&self) -> Span {
             Span::from(self)
         }
 
         fn get(&self) -> Self::Value where Self::Value: Copy {
             *self.get_ref()
+        }
+    }
+
+    fn make_true() -> bool {
+        true
+    }
+
+    #[derive(Debug)]
+    #[derive(Deserialize)]
+    #[serde(deny_unknown_fields)]
+    pub struct Defaults {
+        #[serde(default = "make_true")]
+        pub args: bool,
+        #[serde(default)]
+        pub env_vars: Option<bool>,
+        #[serde(default = "make_true")]
+        pub optional: bool,
+    }
+
+    impl Default for Defaults {
+        fn default() -> Self {
+            Defaults {
+                args: true,
+                env_vars: None,
+                optional: true,
+            }
         }
     }
 
@@ -595,7 +633,7 @@ pub mod raw {
         #[serde(default)]
         general: General,
         #[serde(default)]
-        defaults: super::Defaults,
+        defaults: Defaults,
         #[cfg(feature = "debconf")]
         debconf: Option<::debconf::DebConfig>,
     }
@@ -670,10 +708,19 @@ pub mod raw {
                 errors.sort_by_key(ValidationError::sort_key);
                 return Err(errors);
             }
+            #[cfg(not(feature = "man"))]
+            {
+                let _ = self.general.name;
+                let _ = self.general.summary;
+                let _ = self.general.doc;
+            }
 
             let general = super::General {
+                #[cfg(feature = "man")]
                 name: self.general.name,
+                #[cfg(feature = "man")]
                 summary: self.general.summary,
+                #[cfg(feature = "man")]
                 doc: self.general.doc,
                 env_prefix: self.general.env_prefix,
                 conf_file_param,
@@ -684,7 +731,6 @@ pub mod raw {
 
             Ok(super::Config {
                 general,
-                defaults: self.defaults,
                 params,
                 switches,
                 #[cfg(feature = "debconf")]
@@ -845,15 +891,10 @@ pub mod raw {
     }
 }
 
-fn make_true() -> bool {
-    true
-}
-
 pub struct Config {
     pub general: General,
     #[cfg(feature = "debconf")]
     pub debconf: Option<::debconf::DebConfig>,
-    pub defaults: Defaults,
     pub params: Vec<Param>,
     pub switches: Vec<Switch>,
 }
@@ -861,12 +902,15 @@ pub struct Config {
 #[derive(Debug, Default)]
 pub struct General {
     /// Name of the program
+    #[cfg(feature = "man")]
     pub name: Option<String>,
 
     /// Short description of the program
+    #[cfg(feature = "man")]
     pub summary: Option<String>,
 
     /// Long description of the program
+    #[cfg(feature = "man")]
     pub doc: Option<String>,
 
     /// Prefix for all env vars - enables
@@ -900,28 +944,6 @@ pub struct General {
     /// If the program name is required `PathBuf` is added to `Metadata` and a nice error message
     /// will be reported if it is missing.
     pub program_name: ProgramName,
-}
-
-#[derive(Debug)]
-#[derive(Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct Defaults {
-    #[serde(default = "make_true")]
-    pub args: bool,
-    #[serde(default)]
-    pub env_vars: Option<bool>,
-    #[serde(default = "make_true")]
-    pub optional: bool,
-}
-
-impl Default for Defaults {
-    fn default() -> Self {
-        Defaults {
-            args: true,
-            env_vars: None,
-            optional: true,
-        }
-    }
 }
 
 pub enum Optionality {

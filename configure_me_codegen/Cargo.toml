@@ -12,7 +12,7 @@ license = "MITNFA"
 build = "build.rs"
 
 [features]
-default = ["man"]
+default = []
 debconf = []
 spanned = ["codespan-reporting"]
 unstable-metabuild = []
@@ -23,8 +23,8 @@ serde_derive = "1.0.101"
 toml = "0.5.4"
 cargo_toml = ">= 0.12.4, < 0.21.0"
 unicode-segmentation = "1.2"
-fmt2io = "0.1"
-void = "1"
+fmt2io = "1.0.0"
+# Generally, you shouldn't turn this on and instead use `cfg_me` tool to generate man pages.
 man = { version = "0.1.1", optional = true }
 # This feature is not public! Do not depend on it, depend on `spanned` instead!
 codespan-reporting = { version = "0.11.1", optional = true }

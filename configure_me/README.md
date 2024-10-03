@@ -56,8 +56,6 @@ doc = "Path to the TLS certificate. The connections will be unsecure if it isn't
 Then, create a simple `build.rs` script, or use `unstable-metabuild` on nightly (see below).
 
 ```rust
-extern crate configure_me_codegen;
-
 fn main() -> Result<(), configure_me_codegen::Error> {
     configure_me_codegen::build_script_auto()
 }
@@ -86,9 +84,6 @@ configure_me_codegen = "0.4.0"
 And finally add appropriate incantations into `src/main.rs`:
 
 ```rust
-#[macro_use]
-extern crate configure_me;
-
 include_config!();
 
 fn main() {
