@@ -45,6 +45,7 @@ pub (crate) mod debconf;
 
 pub mod manifest;
 
+#[cfg(feature = "man")]
 use std::borrow::Borrow;
 use std::fmt;
 use std::io::{self, Read, Write};

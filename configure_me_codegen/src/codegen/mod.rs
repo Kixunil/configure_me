@@ -294,6 +294,7 @@ impl VisitWrite<visitor::MergeShort> for ::config::Switch {
 
 empty!(::config::General, MergeShort);
 
+#[cfg(feature = "man")]
 pub(crate) fn param_long_raw(param: &str) -> String {
     let mut res = String::with_capacity(param.len() + 2);
     res.push_str("--");
@@ -303,10 +304,12 @@ pub(crate) fn param_long_raw(param: &str) -> String {
     res
 }
 
+#[cfg(feature = "man")]
 pub(crate) fn param_long(param: &::config::Param) -> String {
     param_long_raw(&param.name.as_snake_case())
 }
 
+#[cfg(feature = "man")]
 pub(crate) fn switch_long(switch: &::config::Switch) -> String {
     if switch.is_inverted() {
         let mut res = String::with_capacity(switch.name.as_snake_case().len() + 5);
@@ -321,6 +324,7 @@ pub(crate) fn switch_long(switch: &::config::Switch) -> String {
     }
 }
 
+#[cfg(feature = "man")]
 pub(crate) fn param_short(param: &::config::Param) -> Option<String> {
     let abbr = param.abbr?;
     let mut res = String::with_capacity(2);
@@ -329,6 +333,7 @@ pub(crate) fn param_short(param: &::config::Param) -> Option<String> {
     Some(res)
 }
 
+#[cfg(feature = "man")]
 pub(crate) fn switch_short(switch: &::config::Switch) -> Option<String> {
     if let ::config::SwitchKind::Normal { abbr: Some(abbr), .. } = switch.kind {
         let mut res = String::with_capacity(2);
@@ -611,6 +616,7 @@ fn gen_validation_fn<W: Write>(config: &Config, mut output: W) -> fmt::Result {
     Ok(())
 }
 
+#[cfg(feature = "man")]
 fn underscore_to_hypen<W: Write>(mut output: W, ident: &str) -> fmt::Result {
     for c in ident.chars() {
         if c == '_' {
@@ -803,7 +809,6 @@ pub fn generate_code<W: Write>(config: &Config, mut output: W) -> fmt::Result {
     gen_raw_config(config, &mut output)?;
     writeln!(output, "    }}")?;
     writeln!(output)?;
-    writeln!(output, "    #[automatically_derived]")?;
     writeln!(output, "    impl Config {{")?;
     writeln!(output, "        pub fn load<P: AsRef<::std::path::Path>>(config_file_name: P) -> Result<Self, super::Error> {{")?;
     writeln!(output, "            use std::io::Read;")?;
@@ -871,7 +876,6 @@ pub fn generate_code<W: Write>(config: &Config, mut output: W) -> fmt::Result {
     write_params_and_switches::<visitor::ConfigFinal, _>(config, &mut output)?;
     writeln!(output, "}}")?;
     writeln!(output)?;
-    writeln!(output, "#[automatically_derived]")?;
     writeln!(output, "impl Config {{")?;
     writeln!(output, "    pub fn including_optional_config_files<I>(config_files: I) -> Result<(Self, impl Iterator<Item=::std::ffi::OsString>), Error> where I: IntoIterator, I::Item: AsRef<::std::path::Path> {{")?;
     writeln!(output, "        Self::custom_args_and_optional_files(::std::env::args_os(), config_files)")?;
