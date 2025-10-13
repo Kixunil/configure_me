@@ -535,7 +535,6 @@ pub mod raw {
             let mut errors = Vec::new();
             let mut long_args = ArgValidator::with_reserved("help".to_owned());
             let mut short_args = ArgValidator::with_reserved('h');
-
             long_args.check_insert_opt_long(&self.general.conf_file_param).unwrap_or_else(|error| errors.push(error));
             long_args.check_insert_opt_long(&self.general.conf_dir_param).unwrap_or_else(|error| errors.push(error));
             long_args.check_insert_opt_long(&self.general.skip_default_conf_files_switch).unwrap_or_else(|error| errors.push(error));
@@ -581,8 +580,11 @@ pub mod raw {
             }
 
             let general = super::General {
+                #[cfg(feature = "man")]
                 name: self.general.name,
+                #[cfg(feature = "man")]
                 summary: self.general.summary,
+                #[cfg(feature = "man")]
                 doc: self.general.doc,
                 env_prefix: self.general.env_prefix,
                 conf_file_param,
@@ -603,9 +605,15 @@ pub mod raw {
     #[derive(Debug)]
     #[derive(Deserialize, Default)]
     #[serde(deny_unknown_fields)]
+    // Name, summary and doc fields are used with man feature but may be present
+    // in toml spec file used in other contexts. So we allow them in parsing routine
+    // even though they are not used in these other contexts.
     pub struct General {
+        #[allow(unused)]
         name: Option<String>,
+        #[allow(unused)]
         summary: Option<String>,
+        #[allow(unused)]
         doc: Option<String>,
         env_prefix: Option<String>,
         conf_file_param: Option<Spanned<String>>,
@@ -761,12 +769,15 @@ pub struct Config {
 
 #[derive(Debug, Default)]
 pub struct General {
+    #[cfg(feature = "man")]
     /// Name of the program
     pub name: Option<String>,
 
+    #[cfg(feature = "man")]
     /// Short description of the program
     pub summary: Option<String>,
 
+    #[cfg(feature = "man")]
     /// Long description of the program
     pub doc: Option<String>,
 

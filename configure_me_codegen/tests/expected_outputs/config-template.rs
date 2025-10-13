@@ -129,7 +129,6 @@ mod raw {
 <<"raw_config.rs">>
     }
 
-    #[automatically_derived]
     impl Config {
         pub fn load<P: AsRef<::std::path::Path>>(config_file_name: P) -> Result<Self, super::Error> {
             use std::io::Read;
@@ -194,7 +193,6 @@ pub struct Config {
 <<"config.rs">>
 }
 
-#[automatically_derived]
 impl Config {
     pub fn including_optional_config_files<I>(config_files: I) -> Result<(Self, impl Iterator<Item=::std::ffi::OsString>), Error> where I: IntoIterator, I::Item: AsRef<::std::path::Path> {
         Self::custom_args_and_optional_files(::std::env::args_os(), config_files)

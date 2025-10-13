@@ -179,8 +179,10 @@ impl<'a> LoadManifest for &'a PathBuf {
     }
 }
 
+#[cfg(feature = "man")]
 pub(crate) struct BuildScript;
 
+#[cfg(feature = "man")]
 impl LoadManifest for BuildScript {
     type Error = super::Error;
     type Manifest = Manifest;
@@ -218,6 +220,9 @@ macro_rules! impl_load_manifest_ref {
     }
 }
 
+#[cfg(not(feature = "man"))]
+impl_load_manifest!(Manifest, PathBuf, CurrentDir);
+#[cfg(feature = "man")]
 impl_load_manifest!(Manifest, PathBuf, BuildScript, CurrentDir);
 impl_load_manifest_ref!(Manifest, PathBuf, Path);
 
